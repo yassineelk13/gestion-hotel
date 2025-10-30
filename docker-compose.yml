@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # Base de données MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: hotel-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - hotel-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Service Utilisateurs
+  service-utilisateurs:
+    build: ./service-utilisateurs
+    container_name: service-utilisateurs
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_utilisateurs?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - hotel-network
+    restart: on-failure
+
+  # Service Chambres
+  service-chambres:
+    build: ./service-chambres
+    container_name: service-chambres
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_chambres?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - hotel-network
+    restart: on-failure
+
+  # Service Réservations
+  service-reservations:
+    build: ./service-reservations
+    container_name: service-reservations
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_reservations?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+      SERVICE_UTILISATEURS_URL: http://service-utilisateurs:8081/api/utilisateurs
+      SERVICE_CHAMBRES_URL: http://service-chambres:8082/api/chambres
+    depends_on:
+      mysql:
+        condition: service_healthy
+      service-utilisateurs:
+        condition: service_started
+      service-chambres:
+        condition: service_started
+    networks:
+      - hotel-network
+    restart: on-failure
+
+  # Service Paiements
+  service-paiements:
+    build: ./service-paiements
+    container_name: service-paiements
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_paiements?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root123
+      SERVICE_RESERVATIONS_URL: http://service-reservations:8083/api/reservations
+    depends_on:
+      mysql:
+        condition: service_healthy
+      service-reservations:
+        condition: service_started
+    networks:
+      - hotel-network
+    restart: on-failure
+
+  # Frontend React
+  frontend:
+    build: ./frontend-react
+    container_name: frontend-react
+    ports:
+      - "3000:3000"
+    depends_on:
+      - service-utilisateurs
+      - service-chambres
+      - service-reservations
+      - service-paiements
+    networks:
+      - hotel-network
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+
+networks:
+  hotel-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
