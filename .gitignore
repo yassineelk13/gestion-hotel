@@ -1,0 +1,42 @@
+# Fichiers compilés
+*.class
+*.jar
+*.war
+*.ear
+
+# Dossier target (Maven)
+target/
+
+# Fichiers IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Fichiers Eclipse
+.classpath
+.project
+.settings/
+
+# Fichiers VS Code
+.vscode/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*.swp
+*~
+
+# Base de données locale
+*.db
+*.sqlite
+
+# Ne jamais ajouter OneDrive
+OneDrive/
