@@ -66,4 +66,5 @@ public class Utilisateur {
     public String toString() {
         return "Utilisateur{" + "id=" + id + ", email='" + email + '\'' + ", role=" + role + '}';
     }
+
 }

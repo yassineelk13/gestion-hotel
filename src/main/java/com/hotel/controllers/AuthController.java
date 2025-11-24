@@ -173,13 +173,13 @@ public class AuthController {
         return ResponseEntity.status(401).body("Email ou mot de passe incorrect");
     }
 
-    // NOUVELLES MÉTHODES POUR RÉINITIALISATION MOT DE PASSE
+    // MÉTHODES POUR RÉINITIALISATION MOT DE PASSE PAR EMAIL
 
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
         try {
             String email = request.get("email");
-            System.out.println("Demande réinitialisation pour: " + email);
+            System.out.println("🔐 Demande réinitialisation pour: " + email);
 
             Optional<Utilisateur> userOpt = service.findByEmail(email);
             if (userOpt.isEmpty()) {
@@ -194,11 +194,10 @@ public class AuthController {
             // Générer un code de 6 chiffres
             String resetToken = generateResetToken();
 
-            // Envoyer l'email
+            // Envoyer l'email avec le code
             emailService.sendPasswordResetEmail(email, resetToken, user.getNom(), user.getPrenom());
 
-            // Stocker temporairement le token (dans la base ou en mémoire)
-            // Pour la démo, on le stocke dans l'objet utilisateur
+            // Stocker le token dans la base de données
             user.setResetToken(resetToken);
             user.setTokenExpiry(System.currentTimeMillis() + 3600000); // 1 heure
             service.save(user);
@@ -208,8 +207,40 @@ public class AuthController {
             ));
 
         } catch (Exception e) {
-            System.err.println("Erreur forgot-password: " + e.getMessage());
-            return ResponseEntity.badRequest().body("Erreur lors du traitement de la demande");
+            System.err.println("❌ Erreur forgot-password: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Erreur lors du traitement de la demande: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/validate-reset-token")
+    public ResponseEntity<?> validateResetToken(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String token = request.get("token");
+
+            System.out.println("🔍 Validation token pour: " + email + " token: " + token);
+
+            Optional<Utilisateur> userOpt = service.findByEmail(email);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.ok().body(Map.of("valid", false, "message", "Utilisateur non trouvé"));
+            }
+
+            Utilisateur user = userOpt.get();
+
+            // Vérifier le token et son expiration
+            boolean isValid = user.getResetToken() != null &&
+                    user.getResetToken().equals(token) &&
+                    user.getTokenExpiry() > System.currentTimeMillis();
+
+            System.out.println("✅ Token valid: " + isValid);
+            return ResponseEntity.ok().body(Map.of("valid", isValid));
+
+        } catch (Exception e) {
+            System.err.println("❌ Erreur validation token: " + e.getMessage());
+            return ResponseEntity.ok().body(Map.of("valid", false, "error", e.getMessage()));
         }
     }
 
@@ -220,20 +251,35 @@ public class AuthController {
             String token = request.get("token");
             String newPassword = request.get("newPassword");
 
+            System.out.println("🔄 Réinitialisation pour: " + email);
+
             Optional<Utilisateur> userOpt = service.findByEmail(email);
             if (userOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body("Utilisateur non trouvé");
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Utilisateur non trouvé"
+                ));
             }
 
             Utilisateur user = userOpt.get();
 
             // Vérifier le token et son expiration
             if (user.getResetToken() == null || !user.getResetToken().equals(token)) {
-                return ResponseEntity.badRequest().body("Code de réinitialisation invalide");
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Code de réinitialisation invalide"
+                ));
             }
 
             if (user.getTokenExpiry() < System.currentTimeMillis()) {
-                return ResponseEntity.badRequest().body("Le code a expiré");
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Le code a expiré"
+                ));
+            }
+
+            // Vérifier la longueur du mot de passe
+            if (newPassword == null || newPassword.length() < 6) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Le mot de passe doit contenir au moins 6 caractères"
+                ));
             }
 
             // Mettre à jour le mot de passe
@@ -242,12 +288,16 @@ public class AuthController {
             user.setTokenExpiry(null);
             service.save(user);
 
+            System.out.println("✅ Mot de passe réinitialisé pour: " + email);
             return ResponseEntity.ok().body(Map.of(
                     "message", "Mot de passe réinitialisé avec succès"
             ));
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur lors de la réinitialisation");
+            System.err.println("❌ Erreur reset-password: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Erreur lors de la réinitialisation: " + e.getMessage()
+            ));
         }
     }
 
@@ -255,10 +305,13 @@ public class AuthController {
     public ResponseEntity<?> sendPassword(@RequestBody Map<String, String> request) {
         try {
             String email = request.get("email");
+            System.out.println("📧 Envoi mot de passe pour: " + email);
 
             Optional<Utilisateur> userOpt = service.findByEmail(email);
             if (userOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body("Email non trouvé");
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Email non trouvé"
+                ));
             }
 
             Utilisateur user = userOpt.get();
@@ -273,43 +326,19 @@ public class AuthController {
             // Envoyer le mot de passe par email
             emailService.sendPasswordEmail(email, tempPassword, user.getNom(), user.getPrenom());
 
+            System.out.println("✅ Mot de passe temporaire envoyé à: " + email);
             return ResponseEntity.ok().body(Map.of(
                     "message", "Mot de passe envoyé par email"
             ));
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur lors de l'envoi du mot de passe");
+            System.err.println("❌ Erreur send-password: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Erreur lors de l'envoi du mot de passe: " + e.getMessage()
+            ));
         }
     }
 
-    // MÉTHODES UTILITAIRES
-
-    private Map<String, Object> mapUserToResponse(Utilisateur user) {
-        Map<String, Object> userResponse = new HashMap<>();
-        userResponse.put("id", user.getId());
-        userResponse.put("nom", user.getNom());
-        userResponse.put("prenom", user.getPrenom());
-        userResponse.put("email", user.getEmail());
-        userResponse.put("role", user.getRole());
-        return userResponse;
-    }
-
-    private String generateResetToken() {
-        Random random = new Random();
-        int token = 100000 + random.nextInt(900000);
-        return String.valueOf(token);
-    }
-
-    private String generateTempPassword() {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        Random random = new Random();
-        StringBuilder sb = new StringBuilder(8);
-        for (int i = 0; i < 8; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
-        }
-        return sb.toString();
-    }
-    // PUT modifier le mot de passe avec vérification de l'ancien
     // PUT modifier le mot de passe avec vérification de l'ancien
     @PutMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> passwordData, Authentication authentication) {
@@ -348,4 +377,33 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Erreur modification mot de passe: " + e.getMessage());
         }
-    }}
+    }
+
+    // MÉTHODES UTILITAIRES
+
+    private Map<String, Object> mapUserToResponse(Utilisateur user) {
+        Map<String, Object> userResponse = new HashMap<>();
+        userResponse.put("id", user.getId());
+        userResponse.put("nom", user.getNom());
+        userResponse.put("prenom", user.getPrenom());
+        userResponse.put("email", user.getEmail());
+        userResponse.put("role", user.getRole());
+        return userResponse;
+    }
+
+    private String generateResetToken() {
+        Random random = new Random();
+        int token = 100000 + random.nextInt(900000);
+        return String.valueOf(token);
+    }
+
+    private String generateTempPassword() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder(8);
+        for (int i = 0; i < 8; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
+}

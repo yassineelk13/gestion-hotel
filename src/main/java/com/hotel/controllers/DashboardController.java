@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/dashboard")
-@CrossOrigin(origins = {"http://localhost:3000", "http://192.168.100.107:3000"}, maxAge = 3600)
+@CrossOrigin(origins = {"http://localhost:3000", "http://192.168.100.19:3000"}, maxAge = 3600)
 public class DashboardController {
 
     @GetMapping("/admin")

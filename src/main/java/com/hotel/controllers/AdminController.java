@@ -79,6 +79,19 @@ public class AdminController {
             return ResponseEntity.badRequest().body("Erreur modification utilisateur: " + e.getMessage());
         }
     }
+    @GetMapping("/users/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable Long id) {
+        try {
+            Optional<Utilisateur> user = utilisateurService.findById(id);
+            if (user.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(user.get());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Erreur récupération utilisateur: " + e.getMessage());
+        }
+    }
+
     // DELETE supprimer un utilisateur
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {

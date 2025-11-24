@@ -52,4 +52,7 @@ public class UtilisateurService {
     public Utilisateur save(Utilisateur utilisateur) {
         return utilisateurRepository.save(utilisateur);
     }
+    public Optional<Utilisateur> findByResetToken(String resetToken) {
+        return utilisateurRepository.findByResetToken(resetToken);
+    }
 }
