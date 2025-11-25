@@ -1,0 +1,90 @@
+# Laravel
+*.log
+.env
+.env.backup
+.env.production
+.env.local
+.env.*.local
+.phpactor.json
+.phpunit.result.cache
+/.fleet
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/public/mix-manifest.json
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/app/*
+!/storage/app/.gitignore
+!/storage/app/public
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/vendor
+Homestead.json
+Homestead.yaml
+
+# Database
+/database/*.sqlite
+/database/*.sqlite-journal
+/database/*.db
+
+# Frontend (React/Vite)
+/frontend/node_modules
+/frontend/dist
+/frontend/.env
+/frontend/.env.local
+/frontend/.env.*.local
+/frontend/.vite
+/frontend/.DS_Store
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# Package managers
+.npm
+.yarn
+.pnpm-store
+yarn-error.log
+pnpm-debug.log
+
+# Build artifacts
+*.cache
+.cache/
+dist/
+build/
+*.map
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
