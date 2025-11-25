@@ -20,10 +20,9 @@ spring:
 
 services:
   utilisateurs:
-    url: http://192.168.100.10:8080
+    url: http://localhost:8080
   chambres:
-    url: http://192.168.100.61:8082
-    jwt-token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOi8vMTkyLjE2OC4xMDAuNjE6ODA4Mi9hcGkvbG9naW4iLCJpYXQiOjE3MzE4NjI3NTAsImV4cCI6MTczMTg2NjM1MCwibmJmIjoxNzMxODYyNzUwLCJqdGkiOiJtS3FYOEhEQmV6S3ZKNWRUIiwic3ViIjoiMSIsInBydiI6IjIzYmQ1Yzg5NDlmNjAwYWRiMzllNzAxYzQwMDg3MmRiN2E1OTc2ZjcifQ.xc0UwTSYOcUXjHf4x9wxjI9vXMWPR36-TzQPo5S5BYEx"
+    url: http://localhost:8082
  #http://localhost:8083
   paiements:
     url: http://localhost:8084
