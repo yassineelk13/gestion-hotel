@@ -1,0 +1,477 @@
+/* Login.css - Version améliorée et centrée */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.login-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.login-container {
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    display: flex;
+    max-width: 1000px;
+    width: 100%;
+    min-height: 600px;
+    position: relative;
+}
+
+/* Section Image */
+.login-image {
+    flex: 1;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    position: relative;
+    overflow: hidden;
+}
+
+.login-image::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+            radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 50%);
+}
+
+.login-image-content {
+    text-align: center;
+    color: white;
+    position: relative;
+    z-index: 2;
+    max-width: 400px;
+}
+
+.hotel-icon {
+    font-size: 5rem;
+    margin-bottom: 1.5rem;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.login-image-content h1 {
+    font-size: 2.8rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.login-image-content p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    font-weight: 300;
+    line-height: 1.5;
+}
+
+/* Section Formulaire */
+.login-form {
+    flex: 1;
+    padding: 60px 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: #ffffff;
+}
+
+.form-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.logo {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.5px;
+}
+
+.subtitle {
+    color: #6b7280;
+    font-size: 1.1rem;
+    font-weight: 400;
+}
+
+/* Formulaire */
+.login-form-content {
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.form-group {
+    margin-bottom: 1.75rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: #374151;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 16px 18px;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    background: #fafafa;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
+}
+
+.form-input:disabled {
+    background-color: #f3f4f6;
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Options du formulaire */
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.checkbox {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 2px solid #d1d5db;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.checkbox:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+.remember-me label {
+    color: #6b7280;
+    font-weight: 500;
+    margin: 0;
+    cursor: pointer;
+}
+
+.forgot-password {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.forgot-password:hover {
+    color: #5a67d8;
+    text-decoration: underline;
+}
+
+/* Message d'erreur */
+.error-message {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 14px 16px;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    border: 1px solid #fecaca;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.error-icon {
+    font-size: 1.1rem;
+}
+
+/* Bouton de connexion */
+.btn-login {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    margin-bottom: 2rem;
+}
+
+.btn-login:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+}
+
+.btn-login:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-login:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Lien d'inscription */
+.signup-link {
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.95rem;
+}
+
+.signup-link span {
+    margin-right: 0.5rem;
+}
+
+.signup-link a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 700;
+    transition: color 0.2s;
+}
+
+.signup-link a:hover {
+    color: #5a67d8;
+    text-decoration: underline;
+}
+
+/* Styles pour l'état "déjà connecté" */
+.already-connected {
+    text-align: center;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.connected-info h3 {
+    color: #111827;
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.connected-info p {
+    color: #6b7280;
+    margin-bottom: 2rem;
+    line-height: 1.6;
+    font-size: 1rem;
+}
+
+.connected-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.btn-continue {
+    padding: 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.btn-continue:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+}
+
+.btn-logout {
+    padding: 14px;
+    background: transparent;
+    color: #667eea;
+    border: 2px solid #667eea;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.btn-logout:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 968px) {
+    .login-container {
+        flex-direction: column;
+        max-width: 500px;
+        min-height: auto;
+    }
+
+    .login-image {
+        min-height: 250px;
+        padding: 40px 30px;
+    }
+
+    .hotel-icon {
+        font-size: 4rem;
+    }
+
+    .login-image-content h1 {
+        font-size: 2.2rem;
+    }
+
+    .login-image-content p {
+        font-size: 1.1rem;
+    }
+
+    .login-form {
+        padding: 40px 35px;
+    }
+}
+
+@media (max-width: 640px) {
+    .login-page {
+        padding: 15px;
+    }
+
+    .login-container {
+        border-radius: 20px;
+    }
+
+    .login-image {
+        min-height: 200px;
+        padding: 30px 25px;
+    }
+
+    .hotel-icon {
+        font-size: 3.5rem;
+    }
+
+    .login-image-content h1 {
+        font-size: 2rem;
+    }
+
+    .login-form {
+        padding: 35px 25px;
+    }
+
+    .form-options {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .connected-actions {
+        flex-direction: column;
+    }
+
+    .logo {
+        font-size: 2rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-form {
+        padding: 30px 20px;
+    }
+
+    .login-image {
+        padding: 25px 20px;
+    }
+
+    .hotel-icon {
+        font-size: 3rem;
+    }
+
+    .login-image-content h1 {
+        font-size: 1.8rem;
+    }
+
+    .form-input {
+        padding: 14px 16px;
+    }
+
+    .btn-login, .btn-continue, .btn-logout {
+        padding: 14px;
+    }
+}
