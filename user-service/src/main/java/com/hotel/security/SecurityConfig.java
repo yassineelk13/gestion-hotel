@@ -50,8 +50,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/test").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/auth/validate-reset-token").permitAll() // ✅ AJOUTÉ
                         .requestMatchers("/api/auth/reset-password").permitAll()
-                        .requestMatchers("/api/auth/send-password").permitAll() // AJOUTER CETTE LIGNE
+                        .requestMatchers("/api/auth/send-password").permitAll()
+                        .requestMatchers("/api/users/exists/**").permitAll()
+                        .requestMatchers("/api/users/{id}").permitAll()
 
                         // Routes protégées par rôle
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")

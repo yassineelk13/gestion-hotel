@@ -40,3 +40,7 @@ Thumbs.db
 
 # Ne jamais ajouter OneDrive
 OneDrive/
+
+text
+.env
+*.env

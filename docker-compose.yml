@@ -1,34 +1,37 @@
-version: '3.8'
-
 services:
   # Base de données MySQL
   mysql:
     image: mysql:8.0
     container_name: hotel-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_ROOT_PASSWORD: ""              # ✅ Mot de passe vide
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"    # ✅ Autoriser mot de passe vide
+      MYSQL_DATABASE: gestion_hotel
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - hotel-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
       timeout: 20s
       retries: 10
 
-  # Service Utilisateurs
-  service-utilisateurs:
-    build: ./service-utilisateurs
-    container_name: service-utilisateurs
+  # Service Utilisateurs (Spring Boot)
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: hotel-user-service
     ports:
-      - "8081:8081"
+      - "8080:8080"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_utilisateurs?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root123
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -36,16 +39,23 @@ services:
       - hotel-network
     restart: on-failure
 
-  # Service Chambres
-  service-chambres:
-    build: ./service-chambres
-    container_name: service-chambres
+
+
+  # Service Chambres (Laravel)
+  chambre-service:
+    build:
+      context: ./chambre-service
+      dockerfile: Dockerfile
+    container_name: hotel-chambre-service
     ports:
       - "8082:8082"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_chambres?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root123
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: chambres_db
+      DB_USERNAME: root
+      DB_PASSWORD: ""    # ✅ Vide
     depends_on:
       mysql:
         condition: service_healthy
@@ -53,68 +63,52 @@ services:
       - hotel-network
     restart: on-failure
 
-  # Service Réservations
-  service-reservations:
-    build: ./service-reservations
-    container_name: service-reservations
+
+  # Service Réservations (Spring Boot)
+  reservation-service:
+    build:
+      context: ./reservation-service
+      dockerfile: Dockerfile
+    container_name: hotel-reservation-service
     ports:
       - "8083:8083"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_reservations?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root123
-      SERVICE_UTILISATEURS_URL: http://service-utilisateurs:8081/api/utilisateurs
-      SERVICE_CHAMBRES_URL: http://service-chambres:8082/api/chambres
+      - MAIL_HOST=smtp.gmail.com
+      - MAIL_PORT=587
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
-      service-utilisateurs:
-        condition: service_started
-      service-chambres:
-        condition: service_started
     networks:
       - hotel-network
     restart: on-failure
 
-  # Service Paiements
-  service-paiements:
-    build: ./service-paiements
-    container_name: service-paiements
-    ports:
-      - "8084:8084"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/db_paiements?createDatabaseIfNotExist=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root123
-      SERVICE_RESERVATIONS_URL: http://service-reservations:8083/api/reservations
-    depends_on:
-      mysql:
-        condition: service_healthy
-      service-reservations:
-        condition: service_started
-    networks:
-      - hotel-network
-    restart: on-failure
 
   # Frontend React
   frontend:
-    build: ./frontend-react
-    container_name: frontend-react
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hotel-frontend
     ports:
       - "3000:3000"
+    environment:
+      REACT_APP_USER_API_URL: http://localhost:8080/api
+      REACT_APP_CHAMBRE_API_URL: http://localhost:8082/api
+      REACT_APP_RESERVATION_API_URL: http://localhost:8083/api
     depends_on:
-      - service-utilisateurs
-      - service-chambres
-      - service-reservations
-      - service-paiements
+      - user-service
+      - chambre-service
+      - reservation-service
     networks:
       - hotel-network
-    environment:
-      - REACT_APP_API_URL=http://localhost:8080
+    stdin_open: true
+    tty: true
 
 networks:
   hotel-network:
     driver: bridge
 
 volumes:
-  mysql-data:
+  mysql_data:

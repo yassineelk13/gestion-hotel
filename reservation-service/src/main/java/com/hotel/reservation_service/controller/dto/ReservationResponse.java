@@ -1,13 +1,11 @@
 package com.hotel.reservation_service.controller.dto;
 
-import com.hotel.reservation_service.model.EtatFacture;
 import com.hotel.reservation_service.model.Reservation;
 import com.hotel.reservation_service.model.StatutReservation;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -21,14 +19,10 @@ public class ReservationResponse {
     private Long idChambre;
     private LocalDate dateDebut;
     private LocalDate dateFin;
-    private StatutReservation statut;
     private LocalDateTime dateCreation;
-
-    // Facture info
-    private Long idFacture;
-    private BigDecimal montantTotal;
-    private EtatFacture etatFacture;
-    private LocalDateTime dateEmissionFacture;
+    private LocalDateTime dateModification;
+    private StatutReservation statut;
+    private FactureResponse facture;  // ← AJOUTER CE CHAMP
 
     public static ReservationResponse fromEntity(Reservation reservation) {
         ReservationResponse response = new ReservationResponse();
@@ -37,14 +31,13 @@ public class ReservationResponse {
         response.setIdChambre(reservation.getIdChambre());
         response.setDateDebut(reservation.getDateDebut());
         response.setDateFin(reservation.getDateFin());
-        response.setStatut(reservation.getStatut());
         response.setDateCreation(reservation.getDateCreation());
+        response.setDateModification(reservation.getDateModification());
+        response.setStatut(reservation.getStatut());
 
+        // Inclure la facture si elle existe
         if (reservation.getFacture() != null) {
-            response.setIdFacture(reservation.getFacture().getIdFacture());
-            response.setMontantTotal(reservation.getFacture().getMontantTotal());
-            response.setEtatFacture(reservation.getFacture().getEtat());
-            response.setDateEmissionFacture(reservation.getFacture().getDateEmission());
+            response.setFacture(FactureResponse.fromEntity(reservation.getFacture()));
         }
 
         return response;

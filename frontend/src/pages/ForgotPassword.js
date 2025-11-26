@@ -47,10 +47,17 @@ const ForgotPassword = () => {
     };
 
     // Étape 2: Valider le code
+    // Étape 2: Valider le code
+    // Étape 2: Valider le code
     const handleValidateCode = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setMessage('');
+
+        console.log('🔍 Début validation');
+        console.log('📧 Email:', email);
+        console.log('🔢 Token:', token);
 
         try {
             const response = await api.post('/auth/validate-reset-token', {
@@ -58,18 +65,35 @@ const ForgotPassword = () => {
                 token: token
             });
 
-            if (response.data.valid) {
+            console.log('✅ Réponse reçue:', response);
+            console.log('✅ Status:', response.status);
+            console.log('✅ Data:', response.data);
+
+            // ✅ Vérifier le status HTTP
+            if (response.status === 200) {
+                console.log('✅ Code validé ! Passage à l\'étape 3');
                 setMessage("✅ Code validé avec succès");
-                setStep(3); // Passer à l'étape du nouveau mot de passe
+                setError('');
+                setStep(3);
             } else {
-                setError("❌ Code invalide ou expiré");
+                console.log('❌ Status inattendu:', response.status);
+                setError('Code invalide ou expiré');
             }
         } catch (err) {
-            setError(err.response?.data?.error || 'Erreur de validation du code');
+            console.error('❌ Erreur validation:', err);
+            console.error('❌ Response:', err.response);
+            console.error('❌ Data:', err.response?.data);
+
+            const errorMessage = err.response?.data?.message ||
+                err.response?.data?.error ||
+                'Code invalide ou expiré';
+            setError(errorMessage);
         } finally {
             setLoading(false);
+            console.log('🏁 Fin validation');
         }
     };
+
 
     // Étape 3: Réinitialiser le mot de passe
     const handleResetPassword = async (e) => {

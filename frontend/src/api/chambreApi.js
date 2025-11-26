@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const chambreApi = axios.create({
-    baseURL: process.env.REACT_APP_CHAMBRE_API_URL || 'http://192.168.100.44:8082/api',
+    baseURL: process.env.REACT_APP_CHAMBRE_API_URL || 'http://localhost:8082/api',
     timeout: 10000,
 });
 

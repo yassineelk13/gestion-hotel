@@ -1,6 +1,8 @@
 package com.hotel.entities;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
 
 @Entity
 @Table(name = "utilisateur")
@@ -23,8 +25,17 @@ public class Utilisateur {
     private Role role;
 
     // NOUVEAUX CHAMPS POUR RÉINITIALISATION
+
+
+    // NOUVEAUX CHAMPS POUR RÉINITIALISATION
+
+
+    // NOUVEAUX CHAMPS POUR RÉINITIALISATION
     private String resetToken;
-    private Long tokenExpiry;
+    private LocalDateTime tokenExpiry;  // ✅
+    //jajaj
+
+
 
     public Utilisateur() {}
 
@@ -59,11 +70,22 @@ public class Utilisateur {
     public String getResetToken() { return resetToken; }
     public void setResetToken(String resetToken) { this.resetToken = resetToken; }
 
-    public Long getTokenExpiry() { return tokenExpiry; }
-    public void setTokenExpiry(Long tokenExpiry) { this.tokenExpiry = tokenExpiry; }
+    public LocalDateTime getTokenExpiry() { return tokenExpiry; }  // ✅
+    public void setTokenExpiry(LocalDateTime tokenExpiry) { this.tokenExpiry = tokenExpiry; }  // ✅
 
     @Override
     public String toString() {
         return "Utilisateur{" + "id=" + id + ", email='" + email + '\'' + ", role=" + role + '}';
+    }
+
+    @Column(name = "actif")
+    private boolean actif = true;  // Actif par défaut
+
+    public boolean isActif() {
+        return actif;
+    }
+
+    public void setActif(boolean actif) {
+        this.actif = actif;
     }
 }

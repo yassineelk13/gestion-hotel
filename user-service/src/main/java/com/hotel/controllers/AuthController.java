@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.Random;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -197,10 +198,9 @@ public class AuthController {
             // Envoyer l'email
             emailService.sendPasswordResetEmail(email, resetToken, user.getNom(), user.getPrenom());
 
-            // Stocker temporairement le token (dans la base ou en mémoire)
-            // Pour la démo, on le stocke dans l'objet utilisateur
+            // Stocker temporairement le token
             user.setResetToken(resetToken);
-            user.setTokenExpiry(System.currentTimeMillis() + 3600000); // 1 heure
+            user.setTokenExpiry(LocalDateTime.now().plusHours(1)); // ✅ LocalDateTime
             service.save(user);
 
             return ResponseEntity.ok().body(Map.of(
@@ -212,6 +212,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Erreur lors du traitement de la demande");
         }
     }
+
 
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
@@ -232,7 +233,7 @@ public class AuthController {
                 return ResponseEntity.badRequest().body("Code de réinitialisation invalide");
             }
 
-            if (user.getTokenExpiry() < System.currentTimeMillis()) {
+            if (user.getTokenExpiry() == null || user.getTokenExpiry().isBefore(LocalDateTime.now())) { // ✅ LocalDateTime
                 return ResponseEntity.badRequest().body("Le code a expiré");
             }
 
@@ -250,6 +251,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Erreur lors de la réinitialisation");
         }
     }
+
 
     @PostMapping("/send-password")
     public ResponseEntity<?> sendPassword(@RequestBody Map<String, String> request) {
@@ -348,4 +350,51 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Erreur modification mot de passe: " + e.getMessage());
         }
-    }}
+    }
+    @PostMapping("/validate-reset-token")
+    public ResponseEntity<?> validateResetToken(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String token = request.get("token");
+
+            System.out.println("🔍 Validation token pour: " + email);
+            System.out.println("🔍 Token reçu: " + token);
+
+            Optional<Utilisateur> userOpt = service.findByEmail(email);
+            if (userOpt.isEmpty()) {
+                System.err.println("❌ Utilisateur non trouvé");
+                return ResponseEntity.status(403).body(Map.of("message", "Utilisateur non trouvé"));
+            }
+
+            Utilisateur user = userOpt.get();
+
+            System.out.println("🔍 Token en DB: " + user.getResetToken());
+            System.out.println("🔍 Expiration: " + user.getTokenExpiry());
+
+            // Vérifier le token
+            if (user.getResetToken() == null || !user.getResetToken().equals(token)) {
+                System.err.println("❌ Token invalide");
+                return ResponseEntity.status(403).body(Map.of("message", "Code de réinitialisation invalide"));
+            }
+
+            // Vérifier l'expiration
+            if (user.getTokenExpiry() == null || user.getTokenExpiry().isBefore(LocalDateTime.now())) {
+                System.err.println("❌ Token expiré");
+                return ResponseEntity.status(403).body(Map.of("message", "Le code a expiré"));
+            }
+
+            System.out.println("✅ Token valide !");
+            return ResponseEntity.ok(Map.of(
+                    "message", "Token valide",
+                    "email", email
+            ));
+
+        } catch (Exception e) {
+            System.err.println("❌ Erreur validation: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(403).body(Map.of("message", "Erreur lors de la validation"));
+        }
+    }
+
+
+}

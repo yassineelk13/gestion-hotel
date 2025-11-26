@@ -47,17 +47,26 @@ public class ReservationService {
         log.info("Création d'une réservation pour le client {} et chambre {}",
                 request.getIdClient(), request.getIdChambre());
 
-        // 1. Vérifier que l'utilisateur existe (commenté pour l'instant)
-//        try {
-//            String userUrl = utilisateursServiceUrl + "/api/admin/users/" + request.getIdClient();
-//            UtilisateurResponse utilisateur = restTemplate.getForObject(userUrl, UtilisateurResponse.class);
-//            log.info("Utilisateur trouvé : {} {}", utilisateur.getPrenom(), utilisateur.getNom());
-//        } catch (Exception e) {
-//            log.error("Erreur lors de la vérification de l'utilisateur : {}", e.getMessage());
-//            throw new NotFoundException("Client avec l'ID " + request.getIdClient() + " introuvable");
-//        }
+        // 1. Vérifier que l'utilisateur existe
+        // 1. Vérifier que l'utilisateur existe
+        try {
+            String userExistsUrl = utilisateursServiceUrl + "/api/users/exists/" + request.getIdClient();
+            log.info("🔍 Vérification utilisateur : {}", userExistsUrl);
 
-        // 2. Vérifier que la chambre existe et est disponible
+            Boolean userExists = restTemplate.getForObject(userExistsUrl, Boolean.class);
+
+            if (userExists == null || !userExists) {
+                throw new NotFoundException("Client avec l'ID " + request.getIdClient() + " introuvable");
+            }
+
+            log.info("✅ Utilisateur {} existe", request.getIdClient());
+        } catch (Exception e) {
+            log.error("❌ Erreur lors de la vérification de l'utilisateur : {}", e.getMessage());
+            throw new NotFoundException("Client avec l'ID " + request.getIdClient() + " introuvable");
+        }
+
+
+        // 2. Vérifier que la chambre existe et est disponible (commenté pour l'instant)
         ChambreResponse.ChambreData chambre;
         try {
             String chambreUrl = chambresServiceUrl + "/api/chambres/" + request.getIdChambre();
@@ -89,6 +98,7 @@ public class ReservationService {
         // Utiliser le prix de la chambre (convertir Double en BigDecimal)
         BigDecimal prixParNuit = chambre.getPrixParNuit() != null ?
                 BigDecimal.valueOf(chambre.getPrixParNuit()) : BigDecimal.valueOf(100.00);
+//        BigDecimal prixParNuit = BigDecimal.valueOf(100.00);
 
         BigDecimal montantTotal = prixParNuit.multiply(BigDecimal.valueOf(nombreNuits));
 

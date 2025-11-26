@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Configuration pour l'API de réservation
 const reservationApi = axios.create({
-    baseURL: process.env.REACT_APP_RESERVATION_API_URL || 'http://192.168.100.18:8083/api',
+    baseURL: process.env.REACT_APP_RESERVATION_API_URL || 'http://localhost:8083/api',
     timeout: 10000,
 });
 

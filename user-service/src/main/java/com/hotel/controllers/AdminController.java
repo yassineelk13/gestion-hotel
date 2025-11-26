@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+import java.util.HashMap;
 
 import java.util.List;
 import java.util.Optional;
@@ -100,4 +102,76 @@ public class AdminController {
             return ResponseEntity.badRequest().body("Erreur suppression: " + e.getMessage());
         }
     }
+
+    @PutMapping("/users/{id}/status")
+    public ResponseEntity<?> changeUserStatus(
+            @PathVariable Long id,
+            @RequestBody StatusRequest request
+    ) {
+        try {
+            Optional<Utilisateur> existing = utilisateurService.findById(id);
+            if (existing.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            Utilisateur user = existing.get();
+            user.setActif(request.isActif());
+
+            Utilisateur updated = utilisateurService.save(user);
+            return ResponseEntity.ok(updated);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Erreur changement statut: " + e.getMessage());
+        }
+    }
+
+    // Classe interne pour la requête de statut
+    public static class StatusRequest {
+        private boolean actif;
+
+        public boolean isActif() {
+            return actif;
+        }
+
+        public void setActif(boolean actif) {
+            this.actif = actif;
+        }
+    }
+
+    // GET statistiques admin
+    @GetMapping("/stats")
+    public ResponseEntity<?> getAdminStats() {
+        try {
+            List<Utilisateur> allUsers = utilisateurService.findAll();
+
+            long totalUsers = allUsers.size();
+            long clients = allUsers.stream()
+                    .filter(u -> u.getRole() == Role.CLIENT)
+                    .count();
+            long admins = allUsers.stream()
+                    .filter(u -> u.getRole() == Role.ADMIN)
+                    .count();
+            long receptionnistes = allUsers.stream()
+                    .filter(u -> u.getRole() == Role.RECEPTIONNISTE)
+                    .count();
+            long activeUsers = allUsers.stream()
+                    .filter(Utilisateur::isActif)
+                    .count();
+
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalUsers", totalUsers);
+            stats.put("clients", clients);
+            stats.put("admins", admins);
+            stats.put("receptionnistes", receptionnistes);
+            stats.put("activeUsers", activeUsers);
+            stats.put("inactiveUsers", totalUsers - activeUsers);
+
+            return ResponseEntity.ok(stats);
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Erreur récupération stats: " + e.getMessage());
+        }
+    }
+
+
 }
