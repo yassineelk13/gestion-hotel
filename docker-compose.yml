@@ -30,16 +30,14 @@ services:
     environment:
       - MAIL_HOST=smtp.gmail.com
       - MAIL_PORT=587
-      - MAIL_USERNAME=${MAIL_USERNAME}
-      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_USERNAME=\${MAIL_USERNAME}
+      - MAIL_PASSWORD=\${MAIL_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - hotel-network
     restart: on-failure
-
-
 
   # Service Chambres (Laravel)
   chambre-service:
@@ -63,7 +61,6 @@ services:
       - hotel-network
     restart: on-failure
 
-
   # Service Réservations (Spring Boot)
   reservation-service:
     build:
@@ -75,8 +72,8 @@ services:
     environment:
       - MAIL_HOST=smtp.gmail.com
       - MAIL_PORT=587
-      - MAIL_USERNAME=${MAIL_USERNAME}
-      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_USERNAME=\${MAIL_USERNAME}
+      - MAIL_PASSWORD=\${MAIL_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -84,6 +81,36 @@ services:
       - hotel-network
     restart: on-failure
 
+  # 💳 Service Paiement (Spring Boot)
+  paiement-service:
+    build:
+      context: ./paiement-service
+      dockerfile: Dockerfile
+    container_name: hotel-paiement-service
+    ports:
+      - "8084:8084"
+    environment:
+      # Base de données
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: paiements_db
+      DB_USER: root
+      DB_PASSWORD: ""
+
+      # ✅ Stripe - UTILISE VARIABLES D'ENVIRONNEMENT
+      STRIPE_SECRET_KEY: \${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: \${STRIPE_PUBLISHABLE_KEY}
+
+      # URL des autres services
+      RESERVATION_SERVICE_URL: http://reservation-service:8083/api
+    depends_on:
+      mysql:
+        condition: service_healthy
+      reservation-service:
+        condition: service_started
+    networks:
+      - hotel-network
+    restart: on-failure
 
   # Frontend React
   frontend:
@@ -97,10 +124,12 @@ services:
       REACT_APP_USER_API_URL: http://localhost:8080/api
       REACT_APP_CHAMBRE_API_URL: http://localhost:8082/api
       REACT_APP_RESERVATION_API_URL: http://localhost:8083/api
+      REACT_APP_PAIEMENT_API_URL: http://localhost:8084/api
     depends_on:
       - user-service
       - chambre-service
       - reservation-service
+      - paiement-service
     networks:
       - hotel-network
     stdin_open: true

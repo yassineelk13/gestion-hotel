@@ -98,7 +98,7 @@ public class ReservationService {
         // Utiliser le prix de la chambre (convertir Double en BigDecimal)
         BigDecimal prixParNuit = chambre.getPrixParNuit() != null ?
                 BigDecimal.valueOf(chambre.getPrixParNuit()) : BigDecimal.valueOf(100.00);
-//        BigDecimal prixParNuit = BigDecimal.valueOf(100.00);
+        //BigDecimal prixParNuit = BigDecimal.valueOf(100.00);
 
         BigDecimal montantTotal = prixParNuit.multiply(BigDecimal.valueOf(nombreNuits));
 

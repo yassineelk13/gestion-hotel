@@ -14,8 +14,4 @@ public class PaiementServiceApplication {
         System.out.println("💳 Stripe + PayPal intégrés");
     }
 
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
 }

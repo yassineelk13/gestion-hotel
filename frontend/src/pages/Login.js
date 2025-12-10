@@ -105,7 +105,13 @@ function Login() {
 
                 <div className="login-form">
                     <div className="form-header">
-                        <div className="logo">HotelMS</div>
+                        <div className="logo-hotel">
+                            <div className="logo-hotel-icon">🏨</div>
+                            <div className="logo-hotel-text">
+                                <span className="brand">HotelMS</span>
+                                <span className="tagline">Gestion Hôtelière</span>
+                            </div>
+                        </div>
                         <div className="subtitle">Connectez-vous à votre compte</div>
                     </div>
 

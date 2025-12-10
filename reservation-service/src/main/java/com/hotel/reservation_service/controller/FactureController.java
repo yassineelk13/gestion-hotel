@@ -2,7 +2,11 @@ package com.hotel.reservation_service.controller;
 
 import com.hotel.reservation_service.controller.dto.FactureResponse;
 import com.hotel.reservation_service.model.Facture;
+import com.hotel.reservation_service.model.EtatFacture;  // ← AJOUTÉ
+import com.hotel.reservation_service.model.Reservation;  // ← AJOUTÉ
+import com.hotel.reservation_service.model.StatutReservation;  // ← AJOUTÉ
 import com.hotel.reservation_service.repository.FactureRepository;
+import com.hotel.reservation_service.repository.ReservationRepository;  // ← AJOUTÉ
 import com.hotel.reservation_service.service.EmailService;
 import com.hotel.reservation_service.service.PdfService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,7 @@ import java.util.stream.Collectors;
 public class FactureController {
 
     private final FactureRepository factureRepository;
+    private final ReservationRepository reservationRepository;  // ← AJOUTÉ
     private final PdfService pdfService;
     private final EmailService emailService;
     private final RestTemplate restTemplate;
@@ -61,45 +66,6 @@ public class FactureController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/{id}/payer")
-    public ResponseEntity<FactureResponse> payerFacture(@PathVariable Long id) {
-        log.info("Paiement de la facture {}", id);
-
-        return factureRepository.findById(id)
-                .map(facture -> {
-                    // Changer le statut en PAYEE
-                    facture.setEtat(com.hotel.reservation_service.model.EtatFacture.PAYEE);
-                    Facture saved = factureRepository.save(facture);
-
-                    // Récupérer l'email du client
-                    try {
-                        Long idClient = saved.getReservation().getIdClient();
-                        String userUrl = utilisateursServiceUrl + "/api/users/" + idClient;
-
-                        log.info("📧 Récupération email du client {}", idClient);
-
-                        // Appeler l'API utilisateurs pour récupérer l'email
-                        Map<String, Object> userResponse = restTemplate.getForObject(userUrl, Map.class);
-
-                        if (userResponse != null && userResponse.containsKey("email")) {
-                            String emailClient = (String) userResponse.get("email");
-                            log.info("✅ Email récupéré : {}", emailClient);
-
-                            // Envoyer l'email avec facture
-                            emailService.sendFactureEmail(saved, emailClient);
-                        } else {
-                            log.warn("⚠️ Email non trouvé pour le client {}", idClient);
-                        }
-
-                    } catch (Exception e) {
-                        log.error("❌ Erreur lors de la récupération de l'email ou envoi", e);
-                        // On continue même si l'email échoue
-                    }
-
-                    return ResponseEntity.ok(FactureResponse.fromEntity(saved));
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
 
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> downloadFacturePdf(@PathVariable Long id) {
@@ -144,4 +110,71 @@ public class FactureController {
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    /**
+     * Marquer une facture comme payée
+     * PUT /api/factures/{id}/payer
+     */
+    @PutMapping("/{id}/payer")
+    public ResponseEntity<?> marquerFactureCommePaye(@PathVariable Long id) {
+        try {
+            log.info("💰 Marquage facture {} comme payée", id);
+
+            Facture facture = factureRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Facture non trouvée"));
+
+            // Mettre à jour le statut de la facture
+            facture.setEtat(EtatFacture.PAYEE);
+            facture = factureRepository.save(facture);
+
+            // Mettre à jour la réservation associée
+            Reservation reservation = reservationRepository.findById(facture.getReservation().getIdReservation())
+                    .orElseThrow(() -> new RuntimeException("Réservation non trouvée"));
+
+            reservation.setStatut(StatutReservation.CONFIRMEE);
+            reservationRepository.save(reservation);
+
+            // ✅ NOUVEAU: Envoyer automatiquement l'email avec la facture
+            try {
+                Long idClient = reservation.getIdClient();
+                String userUrl = utilisateursServiceUrl + "/api/users/" + idClient;
+
+                log.info("📧 Récupération email du client {}", idClient);
+
+                Map<String, Object> userResponse = restTemplate.getForObject(userUrl, Map.class);
+
+                if (userResponse != null && userResponse.containsKey("email")) {
+                    String emailClient = (String) userResponse.get("email");
+                    log.info("✅ Email récupéré : {}", emailClient);
+
+                    // Envoyer l'email avec la facture en PDF
+                    emailService.sendFactureEmail(facture, emailClient);
+                    log.info("✅ Email envoyé automatiquement à {}", emailClient);
+                } else {
+                    log.warn("⚠️ Email non trouvé pour le client {}", idClient);
+                }
+
+            } catch (Exception e) {
+                log.error("❌ Erreur lors de l'envoi de l'email (non bloquant): {}", e.getMessage());
+                // On continue même si l'email échoue
+            }
+
+            log.info("✅ Facture et réservation mises à jour");
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Facture marquée comme payée et email envoyé",
+                    "facture", facture
+            ));
+
+        } catch (Exception e) {
+            log.error("❌ Erreur: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Erreur: " + e.getMessage()
+            ));
+        }
+    }
+
+
 }

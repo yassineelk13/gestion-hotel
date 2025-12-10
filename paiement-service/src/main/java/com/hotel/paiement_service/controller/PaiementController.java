@@ -1,59 +1,70 @@
 package com.hotel.paiement_service.controller;
 
-import com.hotel.paiement_service.dto.PaiementRequest;
-import com.hotel.paiement_service.dto.PaiementResponse;
+import com.hotel.paiement_service.model.Paiement;
 import com.hotel.paiement_service.service.PaiementService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.stripe.Stripe;
+import com.stripe.exception.StripeException;
+import com.stripe.model.PaymentIntent;
+import com.stripe.param.PaymentIntentCreateParams;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import jakarta.annotation.PostConstruct;
+import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/paiements")
-@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
+@Slf4j
 public class PaiementController {
 
-    @Autowired
-    private PaiementService paiementService;
+    private final PaiementService paiementService;
 
-    @Value("${stripe.publishable.key}")
-    private String stripePublishableKey;
+    @Value("${stripe.secret-key}")
+    private String stripeSecretKey;
 
     /**
-     * Test endpoint
-     * GET /api/paiements/test
+     * Initialiser Stripe avec la clé secrète au démarrage
      */
-    @GetMapping("/test")
-    public ResponseEntity<String> test() {
-        return ResponseEntity.ok("✅ Paiement Service is running with Stripe + PayPal!");
+    @PostConstruct
+    public void init() {
+        Stripe.apiKey = stripeSecretKey;
+        log.info("✅ Stripe initialisé avec succès");
     }
 
-    /**
-     * Obtenir la clé publique Stripe
-     * GET /api/paiements/stripe/config
-     */
-    @GetMapping("/stripe/config")
-    public ResponseEntity<?> getStripeConfig() {
-        return ResponseEntity.ok(Map.of(
-                "publishableKey", stripePublishableKey
-        ));
-    }
+    // ==================== PAIEMENT CASH (RÉCEPTIONNISTE) ====================
 
     /**
-     * Créer un PaymentIntent Stripe
-     * POST /api/paiements/stripe/create-intent
+     * 💵 Enregistrer un paiement en CASH (sur place)
+     * POST /api/paiements/cash
      */
-    @PostMapping("/stripe/create-intent")
-    public ResponseEntity<?> createStripeIntent(@RequestBody PaiementRequest request) {
+    @PostMapping("/cash")
+    public ResponseEntity<?> payerCash(@RequestBody PaiementCashRequest request) {
         try {
-            System.out.println("📥 Demande création PaymentIntent Stripe: " + request);
-            Map<String, Object> response = paiementService.creerIntentionPaiementStripe(request);
-            return ResponseEntity.ok(response);
+            log.info("💵 Réception demande paiement CASH - Facture: {}", request.getIdFacture());
+
+            Paiement paiement = paiementService.enregistrerPaiementCash(
+                    request.getIdFacture(),
+                    request.getIdReservation(),
+                    request.getMontant(),
+                    request.getIdReceptionniste()
+            );
+
+            log.info("✅ Paiement CASH enregistré avec succès - ID: {}", paiement.getIdPaiement());
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Paiement cash enregistré avec succès",
+                    "paiement", paiement
+            ));
+
         } catch (Exception e) {
-            System.err.println("❌ Erreur: " + e.getMessage());
+            log.error("❌ Erreur lors du paiement cash: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "message", "Erreur: " + e.getMessage()
@@ -61,25 +72,84 @@ public class PaiementController {
         }
     }
 
+    // ==================== PAIEMENT STRIPE (CLIENT) ====================
+
     /**
-     * Confirmer un paiement Stripe
+     * 💳 ÉTAPE 1 : Créer un Payment Intent Stripe
+     * POST /api/paiements/stripe/create-payment-intent
+     */
+    @PostMapping("/stripe/create-payment-intent")
+    public ResponseEntity<?> createStripePaymentIntent(@RequestBody StripePaymentRequest request) {
+        try {
+            log.info("💳 Création Payment Intent Stripe - Facture: {}, Montant: {}",
+                    request.getIdFacture(), request.getMontant());
+
+            // Convertir le montant en centimes (Stripe utilise les centimes)
+            long amountInCents = request.getMontant().multiply(new BigDecimal(100)).longValue();
+
+            // Créer le Payment Intent
+            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
+                    .setAmount(amountInCents)
+                    .setCurrency("mad")  // Dirham marocain
+                    .putMetadata("idFacture", String.valueOf(request.getIdFacture()))
+                    .putMetadata("idReservation", String.valueOf(request.getIdReservation()))
+                    .setDescription("Paiement Facture #" + request.getIdFacture())
+                    .build();
+
+            PaymentIntent intent = PaymentIntent.create(params);
+
+            log.info("✅ Payment Intent créé - ID: {}", intent.getId());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("clientSecret", intent.getClientSecret());
+            response.put("paymentIntentId", intent.getId());
+
+            return ResponseEntity.ok(response);
+
+        } catch (StripeException e) {
+            log.error("❌ Erreur Stripe: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Erreur Stripe: " + e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("❌ Erreur création Payment Intent: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Erreur: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * ✅ ÉTAPE 2 : Confirmer le paiement Stripe
      * POST /api/paiements/stripe/confirm
      */
     @PostMapping("/stripe/confirm")
-    public ResponseEntity<?> confirmStripePayment(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> confirmStripePayment(@RequestBody StripeConfirmRequest request) {
         try {
-            String paymentIntentId = request.get("paymentIntentId");
-            System.out.println("✅ Confirmation paiement Stripe: " + paymentIntentId);
+            log.info("✅ Confirmation paiement Stripe - Facture: {}, PaymentIntent: {}",
+                    request.getIdFacture(), request.getPaymentIntentId());
 
-            PaiementResponse response = paiementService.confirmerPaiementStripe(paymentIntentId);
+            // Enregistrer le paiement dans la base de données
+            Paiement paiement = paiementService.enregistrerPaiementStripe(
+                    request.getIdFacture(),
+                    request.getIdReservation(),
+                    request.getMontant(),
+                    request.getPaymentIntentId()
+            );
+
+            log.info("✅ Paiement Stripe confirmé et enregistré - ID: {}", paiement.getIdPaiement());
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Paiement confirmé avec succès",
-                    "paiement", response
+                    "message", "Paiement effectué avec succès",
+                    "paiement", paiement
             ));
+
         } catch (Exception e) {
-            System.err.println("❌ Erreur: " + e.getMessage());
+            log.error("❌ Erreur confirmation paiement: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "message", "Erreur: " + e.getMessage()
@@ -87,102 +157,92 @@ public class PaiementController {
         }
     }
 
+    // ==================== ENDPOINTS UTILITAIRES ====================
+
     /**
-     * Créer un paiement PayPal
-     * POST /api/paiements/paypal/create
+     * 📋 Récupérer tous les paiements
+     * GET /api/paiements
      */
-    @PostMapping("/paypal/create")
-    public ResponseEntity<?> createPayPalPayment(@RequestBody PaiementRequest request) {
-        try {
-            System.out.println("📥 Demande création paiement PayPal: " + request);
-            Map<String, Object> response = paiementService.creerPaiementPayPal(request);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            System.err.println("❌ Erreur: " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Erreur: " + e.getMessage()
-            ));
-        }
+    @GetMapping
+    public ResponseEntity<?> getAllPaiements() {
+        // À implémenter si besoin pour l'admin
+        return ResponseEntity.ok(Map.of("message", "Endpoint à implémenter"));
     }
 
     /**
-     * Confirmer un paiement PayPal (callback après approbation)
-     * POST /api/paiements/paypal/execute
+     * 🔍 Récupérer un paiement par facture
+     * GET /api/paiements/facture/{idFacture}
      */
-    @PostMapping("/paypal/execute")
-    public ResponseEntity<?> executePayPalPayment(@RequestBody Map<String, String> request) {
-        try {
-            String paymentId = request.get("paymentId");
-            String payerId = request.get("payerId");
+    @GetMapping("/facture/{idFacture}")
+    public ResponseEntity<?> getPaiementByFacture(@PathVariable Long idFacture) {
+        // À implémenter si besoin
+        return ResponseEntity.ok(Map.of("message", "Endpoint à implémenter"));
+    }
 
-            System.out.println("✅ Exécution paiement PayPal: " + paymentId);
+    // ==================== CLASSES DTO ====================
 
-            PaiementResponse response = paiementService.confirmerPaiementPayPal(paymentId, payerId);
+    /**
+     * DTO pour paiement CASH
+     */
+    public static class PaiementCashRequest {
+        private Long idFacture;
+        private Long idReservation;
+        private BigDecimal montant;
+        private Long idReceptionniste;
 
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Paiement PayPal confirmé avec succès",
-                    "paiement", response
-            ));
-        } catch (Exception e) {
-            System.err.println("❌ Erreur: " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Erreur: " + e.getMessage()
-            ));
-        }
+        // Getters et Setters
+        public Long getIdFacture() { return idFacture; }
+        public void setIdFacture(Long idFacture) { this.idFacture = idFacture; }
+
+        public Long getIdReservation() { return idReservation; }
+        public void setIdReservation(Long idReservation) { this.idReservation = idReservation; }
+
+        public BigDecimal getMontant() { return montant; }
+        public void setMontant(BigDecimal montant) { this.montant = montant; }
+
+        public Long getIdReceptionniste() { return idReceptionniste; }
+        public void setIdReceptionniste(Long idReceptionniste) { this.idReceptionniste = idReceptionniste; }
     }
 
     /**
-     * Enregistrer un paiement sur place (RÉCEPTIONNISTE)
-     * POST /api/paiements/sur-place
+     * DTO pour créer Payment Intent Stripe
      */
-    @PostMapping("/sur-place")
-    public ResponseEntity<?> enregistrerPaiementSurPlace(@RequestBody PaiementRequest request) {
-        try {
-            System.out.println("📥 Enregistrement paiement sur place: " + request);
-            PaiementResponse response = paiementService.enregistrerPaiementSurPlace(request);
+    public static class StripePaymentRequest {
+        private Long idFacture;
+        private Long idReservation;
+        private BigDecimal montant;
 
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Paiement enregistré avec succès",
-                    "paiement", response
-            ));
-        } catch (Exception e) {
-            System.err.println("❌ Erreur: " + e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Erreur: " + e.getMessage()
-            ));
-        }
+        // Getters et Setters
+        public Long getIdFacture() { return idFacture; }
+        public void setIdFacture(Long idFacture) { this.idFacture = idFacture; }
+
+        public Long getIdReservation() { return idReservation; }
+        public void setIdReservation(Long idReservation) { this.idReservation = idReservation; }
+
+        public BigDecimal getMontant() { return montant; }
+        public void setMontant(BigDecimal montant) { this.montant = montant; }
     }
 
     /**
-     * Récupérer tous les paiements d'une réservation
-     * GET /api/paiements/reservation/{idReservation}
+     * DTO pour confirmer paiement Stripe
      */
-    @GetMapping("/reservation/{idReservation}")
-    public ResponseEntity<?> getPaiementsParReservation(@PathVariable Long idReservation) {
-        try {
-            List<PaiementResponse> paiements = paiementService.getPaiementsParReservation(idReservation);
-            return ResponseEntity.ok(paiements);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur: " + e.getMessage());
-        }
-    }
+    public static class StripeConfirmRequest {
+        private Long idFacture;
+        private Long idReservation;
+        private BigDecimal montant;
+        private String paymentIntentId;
 
-    /**
-     * Récupérer un paiement par ID
-     * GET /api/paiements/{id}
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getPaiementById(@PathVariable Long id) {
-        try {
-            PaiementResponse paiement = paiementService.getPaiementById(id);
-            return ResponseEntity.ok(paiement);
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
-        }
+        // Getters et Setters
+        public Long getIdFacture() { return idFacture; }
+        public void setIdFacture(Long idFacture) { this.idFacture = idFacture; }
+
+        public Long getIdReservation() { return idReservation; }
+        public void setIdReservation(Long idReservation) { this.idReservation = idReservation; }
+
+        public BigDecimal getMontant() { return montant; }
+        public void setMontant(BigDecimal montant) { this.montant = montant; }
+
+        public String getPaymentIntentId() { return paymentIntentId; }
+        public void setPaymentIntentId(String paymentIntentId) { this.paymentIntentId = paymentIntentId; }
     }
 }

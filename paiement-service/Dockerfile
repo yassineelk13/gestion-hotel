@@ -1,5 +1,5 @@
-# Stage 1: Build
-FROM maven:3.9.5-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
+
 WORKDIR /app
 
 # Copier le pom.xml et télécharger les dépendances
@@ -12,15 +12,16 @@ COPY src ./src
 # Compiler l'application
 RUN mvn clean package -DskipTests
 
-# Stage 2: Run
+# Image finale
 FROM eclipse-temurin:17-jre-alpine
+
 WORKDIR /app
 
-# Copier le JAR depuis le stage de build
+# Copier le JAR depuis l'étape de build
 COPY --from=build /app/target/*.jar app.jar
 
 # Exposer le port
 EXPOSE 8084
 
-# Démarrer l'application
+# Lancer l'application
 ENTRYPOINT ["java", "-jar", "app.jar"]

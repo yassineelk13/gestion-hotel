@@ -57,7 +57,6 @@ const PHOTOS_CHAMBRES = [
     }
 ];
 
-
 function DashboardAdmin() {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -69,22 +68,41 @@ function DashboardAdmin() {
         revenue: 0
     });
     const [users, setUsers] = useState([]);
+    const [clients, setClients] = useState([]);
     const [chambres, setChambres] = useState([]);
     const [reservations, setReservations] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [chambresLoading, setChambresLoading] = useState(false); // Ajouté
+    const [chambresLoading, setChambresLoading] = useState(false);
+
+    // États pour le filtrage
+    const [filterUser, setFilterUser] = useState("");
+    const [filterReservation, setFilterReservation] = useState("");
+    const [filterChambreTypes, setFilterChambreTypes] = useState([]);
+    const [filterPrixMax, setFilterPrixMax] = useState("");
     const [message, setMessage] = useState({ type: '', text: '' });
-    const [showChambreForm, setShowChambreForm] = useState(false); // Ajouté
-    const [showEditForm, setShowEditForm] = useState(false);  // ✅ Nouveau
-    const [editingChambre, setEditingChambre] = useState(null);  // ✅ Nouveau
+    const [showChambreForm, setShowChambreForm] = useState(false);
+    const [showEditForm, setShowEditForm] = useState(false);
+    const [editingChambre, setEditingChambre] = useState(null);
     const [newChambre, setNewChambre] = useState({
         numero: "",
         type: "Standard",
         prix: 0,
         statut: "libre",
-        photo_url: ""  // ✅ Ajouter ce champ
+        photo_url: ""
     });
 
+    // ✅ STATES POUR GESTION UTILISATEURS
+    const [showUserForm, setShowUserForm] = useState(false);
+    const [showEditUserForm, setShowEditUserForm] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
+    const [newUser, setNewUser] = useState({
+        nom: '',
+        prenom: '',
+        email: '',
+        telephone: '',
+        motDePasse: '',
+        role: 'CLIENT'
+    });
 
     const showMessage = (type, text) => {
         setMessage({ type, text });
@@ -92,7 +110,6 @@ function DashboardAdmin() {
     };
 
     // Charger les statistiques
-// Charger les statistiques - CORRIGER cette fonction
     const loadStats = useCallback(async () => {
         try {
             // Stats utilisateurs
@@ -119,11 +136,10 @@ function DashboardAdmin() {
             const reservationsRes = await reservationApi.get('/reservations');
             const reservationsData = reservationsRes.data;
 
-            // ✅ CALCULER LE REVENU À PARTIR DES FACTURES PAYÉES
+            // Calculer le revenu à partir des factures
             const facturesRes = await reservationApi.get('/factures');
             const facturesData = facturesRes.data;
 
-            // Calculer le revenu total (seulement factures PAYÉES)
             const revenue = facturesData
                 .filter(facture => facture.etat === 'PAYEE')
                 .reduce((sum, facture) => sum + (facture.montantTotal || 0), 0);
@@ -132,15 +148,14 @@ function DashboardAdmin() {
                 totalUsers: usersData.length,
                 totalChambres: chambresData.length,
                 totalReservations: reservationsData.length,
-                revenue: revenue,
-                facturesPayees: facturesData.filter(f => f.etat === 'PAYEE').length
+                revenue: revenue
             });
 
             setStats({
                 totalUsers: usersData.length,
                 totalChambres: chambresData.length,
                 totalReservations: reservationsData.length,
-                revenue: revenue  // ✅ Revenu des factures payées
+                revenue: revenue
             });
 
         } catch (err) {
@@ -149,13 +164,10 @@ function DashboardAdmin() {
         }
     }, []);
 
-
-
-// REMPLACER cette fonction dans DashboardAdmin.js
+    // Charger les utilisateurs
     const loadUsers = useCallback(async () => {
         setLoading(true);
         try {
-            // Utiliser le endpoint admin correct
             const response = await api.get('/admin/users');
             console.log('📊 Données utilisateurs (Admin):', response.data);
             setUsers(response.data);
@@ -167,40 +179,38 @@ function DashboardAdmin() {
         }
     }, []);
 
-    // Charger les chambres - CORRIGÉ
-    // Charger les chambres - VERSION COMPLÈTEMENT CORRIGÉE
+
+    // Charger les clients (pour affichage dans réservations)
+    const loadClients = useCallback(async () => {
+        try {
+            const response = await api.get('/admin/users');
+            setClients(response.data);
+        } catch (err) {
+            console.error('❌ Erreur chargement clients:', err);
+        }
+    }, []);
+
+    // Charger les chambres
     const loadChambres = useCallback(async () => {
         setChambresLoading(true);
         try {
             const response = await chambreApi.get('/chambres');
             console.log('📊 Réponse API chambres complète (Admin):', response);
-            console.log('📊 Données brutes (Admin):', response.data);
 
             let chambresData = [];
 
-            // Gérer TOUTES les structures de réponse possibles
             if (response.data) {
-                // Structure Laravel avec success: true
                 if (response.data.success && response.data.data) {
-                    // Structure paginée: {success: true, data: {data: [...], current_page: 1, ...}}
                     if (response.data.data.data && Array.isArray(response.data.data.data)) {
                         chambresData = response.data.data.data;
-                    }
-                    // Structure directe dans data: {success: true, data: [...]}
-                    else if (Array.isArray(response.data.data)) {
+                    } else if (Array.isArray(response.data.data)) {
                         chambresData = response.data.data;
                     }
-                }
-                // Structure directe: [...]
-                else if (Array.isArray(response.data)) {
+                } else if (Array.isArray(response.data)) {
                     chambresData = response.data;
-                }
-                // Structure paginée standard: {data: [...], current_page: 1, ...}
-                else if (response.data.data && Array.isArray(response.data.data)) {
+                } else if (response.data.data && Array.isArray(response.data.data)) {
                     chambresData = response.data.data;
-                }
-                // Structure dans data.data: {data: {data: [...], ...}}
-                else if (response.data.data && response.data.data.data && Array.isArray(response.data.data.data)) {
+                } else if (response.data.data && response.data.data.data && Array.isArray(response.data.data.data)) {
                     chambresData = response.data.data.data;
                 }
             }
@@ -235,20 +245,27 @@ function DashboardAdmin() {
         try {
             const response = await reservationApi.get('/reservations');
             setReservations(response.data);
+
+            // Charger clients si pas déjà fait
+            if (clients.length === 0) {
+                await loadClients();
+            }
+
+            // Charger chambres si pas déjà fait
+            if (chambres.length === 0) {
+                await loadChambres();
+            }
         } catch (err) {
             showMessage('error', "Erreur chargement réservations: " + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [clients.length, chambres.length, loadClients, loadChambres]);
 
-    // Créer une nouvelle chambre - FONCTION AJOUTÉE
-    // Créer une nouvelle chambre - VERSION CORRIGÉE
+    // Créer une nouvelle chambre
     const handleCreateChambre = async (e) => {
         e.preventDefault();
         console.log('🔍 Début création chambre...');
-        console.log('🔍 Données actuelles:', newChambre);
-
         setLoading(true);
 
         try {
@@ -271,7 +288,6 @@ function DashboardAdmin() {
             const response = await chambreApi.post('/chambres', chambreData);
 
             console.log('✅ Réponse complète:', response);
-            console.log('✅ Données reçues:', response.data);
 
             if (response.data.success) {
                 console.log('✅ Succès ! Fermeture du formulaire...');
@@ -291,8 +307,6 @@ function DashboardAdmin() {
 
         } catch (err) {
             console.error('❌ Erreur complète:', err);
-            console.error('❌ Réponse erreur:', err.response?.data);
-
             let errorMessage = "Erreur création chambre: ";
             if (err.response?.data?.message) {
                 errorMessage += err.response.data.message;
@@ -304,12 +318,11 @@ function DashboardAdmin() {
             }
             showMessage('error', errorMessage);
         } finally {
-            console.log('🏁 Fin du traitement');
             setLoading(false);
         }
     };
 
-// Ouvrir le formulaire d'édition
+    // Ouvrir le formulaire d'édition chambre
     const handleEditChambre = (chambre) => {
         console.log('✏️ Édition chambre:', chambre);
         setEditingChambre({
@@ -329,7 +342,7 @@ function DashboardAdmin() {
         setShowEditForm(true);
     };
 
-// Sauvegarder les modifications
+    // Sauvegarder les modifications chambre
     const handleUpdateChambre = async () => {
         console.log('💾 Mise à jour chambre:', editingChambre);
         setLoading(true);
@@ -370,7 +383,6 @@ function DashboardAdmin() {
         }
     };
 
-
     // Changer statut utilisateur (Activer/Désactiver)
     const toggleUserStatus = async (userId, currentStatus) => {
         const action = currentStatus ? 'désactiver' : 'activer';
@@ -392,7 +404,72 @@ function DashboardAdmin() {
         }
     };
 
-    // Supprimer une chambre
+    // ✅ CRÉER UN UTILISATEUR
+    const handleCreateUser = async (e) => {
+        e.preventDefault();
+        console.log('🔍 Création utilisateur:', newUser);
+        setLoading(true);
+
+        try {
+            const response = await api.post('/admin/users', newUser);
+
+            console.log('✅ Réponse:', response.data);
+            showMessage('success', "✅ Utilisateur créé avec succès !");
+            setShowUserForm(false);
+            setNewUser({
+                nom: '',
+                prenom: '',
+                email: '',
+                telephone: '',
+                motDePasse: '',
+                role: 'CLIENT'
+            });
+            loadUsers();
+        } catch (err) {
+            console.error('❌ Erreur création:', err);
+            const errorMsg = err.response?.data?.message || err.message;
+            showMessage('error', "❌ Erreur: " + errorMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ✅ OUVRIR LE FORMULAIRE D'ÉDITION UTILISATEUR
+    const handleEditUser = (user) => {
+        console.log('✏️ Édition utilisateur:', user);
+        setEditingUser({
+            id: user.id,
+            nom: user.nom,
+            prenom: user.prenom,
+            email: user.email,
+            telephone: user.telephone || '',
+            role: user.role
+        });
+        setShowEditUserForm(true);
+    };
+
+    // ✅ METTRE À JOUR UN UTILISATEUR
+    const handleUpdateUser = async () => {
+        console.log('💾 Mise à jour utilisateur:', editingUser);
+        setLoading(true);
+
+        try {
+            const response = await api.put(`/admin/users/${editingUser.id}`, editingUser);
+
+            console.log('✅ Réponse:', response.data);
+            showMessage('success', "✅ Utilisateur modifié avec succès !");
+            setShowEditUserForm(false);
+            setEditingUser(null);
+            loadUsers();
+        } catch (err) {
+            console.error('❌ Erreur modification:', err);
+            const errorMsg = err.response?.data?.message || err.message;
+            showMessage('error', "❌ Erreur: " + errorMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Supprimer une chambre
     const deleteChambre = async (id, numero) => {
         if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la chambre ${numero} ?`)) {
@@ -416,7 +493,6 @@ function DashboardAdmin() {
         }
     };
 
-
     useEffect(() => {
         loadStats();
 
@@ -439,7 +515,6 @@ function DashboardAdmin() {
         return new Date(dateString).toLocaleDateString('fr-FR');
     };
 
-    // Fonction pour obtenir la classe CSS du statut
     const getChambreStatusClass = (statut) => {
         switch (statut) {
             case 'libre':
@@ -453,12 +528,65 @@ function DashboardAdmin() {
                 return 'status-pending';
         }
     };
+    // 🔴 CORRECTION: Fonction pour obtenir la classe CSS du statut de réservation
+    const getReservationStatusClass = (statut) => {
+        if (!statut) return 'status-enattente';
+
+        const statutUpper = statut.toUpperCase();
+
+        switch (statutUpper) {
+            case 'CONFIRMEE':
+            case 'CONFIRMÉ':
+            case 'CONFIRMED':
+                return 'status-confirmee';
+            case 'ANNULEE':
+            case 'ANNULÉ':
+            case 'ANNULÉE':
+            case 'CANCELLED':
+                return 'status-annulee';
+            case 'EN_ATTENTE':
+            case 'EN ATTENTE':
+            case 'PENDING':
+                return 'status-enattente';
+            case 'TERMINEE':
+            case 'TERMINÉ':
+            case 'TERMINÉE':
+            case 'COMPLETED':
+                return 'status-terminee';
+            default:
+                return 'status-enattente';
+        }
+    };
+
+
+    // ✅ Fonctions helper pour affichage dans réservations
+    const getClientName = (userId) => {
+        const client = clients.find(c => c.id === userId);
+        if (client) {
+            return `${client.prenom} ${client.nom}`;
+        }
+        return `Client #${userId}`;
+    };
+
+    const getChambreInfo = (chambreId) => {
+        const chambre = chambres.find(c => (c.id_chambre || c.id) === chambreId);
+        if (chambre) {
+            return `${chambre.type} - #${chambre.numero}`;
+        }
+        return `Chambre #${chambreId}`;
+    };
 
     return (
         <div className="dashboard-container">
             {/* Sidebar */}
             <div className="sidebar">
-                <div className="logo">🏨 Admin HotelMS</div>
+                <div className="logo-hotel">
+                    <div className="logo-hotel-icon">🏨</div>
+                    <div className="logo-hotel-text">
+                        <span className="brand">HotelMS</span>
+                        <span className="tagline">Gestion Hôtelière</span>
+                    </div>
+                </div>
                 <div className={`menu-item ${activeMenu === "dashboard" ? "active" : ""}`}
                      onClick={() => setActiveMenu("dashboard")}>
                     <span>📊</span>
@@ -506,7 +634,7 @@ function DashboardAdmin() {
                     </div>
                 )}
 
-                {/* Formulaire de nouvelle chambre - AJOUTÉ */}
+                {/* Formulaire de nouvelle chambre */}
                 {showChambreForm && (
                     <div className="form-overlay">
                         <div className="form-modal">
@@ -575,7 +703,6 @@ function DashboardAdmin() {
                                     </div>
                                 </div>
 
-                                {/* ✅ SÉLECTEUR DE PHOTOS */}
                                 <div className="form-group">
                                     <label>📸 Choisir une photo *</label>
                                     <div className="photo-selector">
@@ -615,15 +742,11 @@ function DashboardAdmin() {
                                     </button>
                                 </div>
                             </form>
-
-
-
                         </div>
                     </div>
                 )}
 
-
-                {/* ✅ AJOUTER LE MODAL D'ÉDITION ICI */}
+                {/* Modal d'édition chambre */}
                 {showEditForm && editingChambre && (
                     <div className="form-overlay">
                         <div className="form-modal">
@@ -687,7 +810,6 @@ function DashboardAdmin() {
                                     </div>
                                 </div>
 
-                                {/* Sélecteur de photos */}
                                 <div className="form-group">
                                     <label>📸 Photo de la chambre</label>
                                     <div className="photo-selector">
@@ -719,8 +841,196 @@ function DashboardAdmin() {
                     </div>
                 )}
 
+                {/* ✅ MODAL AJOUTER UTILISATEUR */}
+                {showUserForm && (
+                    <div className="form-overlay">
+                        <div className="form-modal">
+                            <div className="modal-header">
+                                <h3>➕ NOUVEL UTILISATEUR</h3>
+                                <button className="close-btn" onClick={() => setShowUserForm(false)}>✕</button>
+                            </div>
 
+                            <form onSubmit={handleCreateUser}>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Prénom *</label>
+                                        <input
+                                            className="form-control"
+                                            value={newUser.prenom}
+                                            onChange={e => setNewUser({...newUser, prenom: e.target.value})}
+                                            required
+                                            placeholder="Ex: Mohamed"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Nom *</label>
+                                        <input
+                                            className="form-control"
+                                            value={newUser.nom}
+                                            onChange={e => setNewUser({...newUser, nom: e.target.value})}
+                                            required
+                                            placeholder="Ex: ALAMI"
+                                        />
+                                    </div>
+                                </div>
 
+                                <div className="form-group">
+                                    <label>Email *</label>
+                                    <input
+                                        className="form-control"
+                                        type="email"
+                                        value={newUser.email}
+                                        onChange={e => setNewUser({...newUser, email: e.target.value})}
+                                        required
+                                        placeholder="exemple@email.com"
+                                    />
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Téléphone</label>
+                                        <input
+                                            className="form-control"
+                                            type="tel"
+                                            value={newUser.telephone}
+                                            onChange={e => setNewUser({...newUser, telephone: e.target.value})}
+                                            placeholder="0612345678"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Rôle *</label>
+                                        <select
+                                            className="form-control"
+                                            value={newUser.role}
+                                            onChange={e => setNewUser({...newUser, role: e.target.value})}
+                                            required
+                                        >
+                                            <option value="CLIENT">CLIENT</option>
+                                            <option value="ADMIN">ADMIN</option>
+                                            <option value="RECEPTIONNISTE">RECEPTIONNISTE</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Mot de passe *</label>
+                                    <input
+                                        className="form-control"
+                                        type="password"
+                                        value={newUser.motDePasse}
+                                        onChange={e => setNewUser({...newUser, motDePasse: e.target.value})}
+                                        required
+                                        minLength="6"
+                                        placeholder="Min. 6 caractères"
+                                    />
+                                </div>
+
+                                <div className="modal-actions">
+                                    <button type="submit" className="btn btn-success" disabled={loading}>
+                                        {loading ? "⏳ Création..." : "💾 CRÉER"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setShowUserForm(false)}
+                                        disabled={loading}
+                                    >
+                                        ANNULER
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* ✅ MODAL MODIFIER UTILISATEUR */}
+                {showEditUserForm && editingUser && (
+                    <div className="form-overlay">
+                        <div className="form-modal">
+                            <div className="modal-header">
+                                <h3>✏️ MODIFIER UTILISATEUR</h3>
+                                <button className="close-btn" onClick={() => setShowEditUserForm(false)}>✕</button>
+                            </div>
+
+                            <form onSubmit={(e) => { e.preventDefault(); handleUpdateUser(); }}>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Prénom *</label>
+                                        <input
+                                            className="form-control"
+                                            value={editingUser.prenom}
+                                            onChange={e => setEditingUser({...editingUser, prenom: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Nom *</label>
+                                        <input
+                                            className="form-control"
+                                            value={editingUser.nom}
+                                            onChange={e => setEditingUser({...editingUser, nom: e.target.value})}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>Email *</label>
+                                    <input
+                                        className="form-control"
+                                        type="email"
+                                        value={editingUser.email}
+                                        onChange={e => setEditingUser({...editingUser, email: e.target.value})}
+                                        required
+                                    />
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Téléphone</label>
+                                        <input
+                                            className="form-control"
+                                            type="tel"
+                                            value={editingUser.telephone}
+                                            onChange={e => setEditingUser({...editingUser, telephone: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Rôle *</label>
+                                        <select
+                                            className="form-control"
+                                            value={editingUser.role}
+                                            onChange={e => setEditingUser({...editingUser, role: e.target.value})}
+                                            required
+                                        >
+                                            <option value="CLIENT">CLIENT</option>
+                                            <option value="ADMIN">ADMIN</option>
+                                            <option value="RECEPTIONNISTE">RECEPTIONNISTE</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <p className="info-text" style={{fontSize: '0.9em', color: '#666', marginTop: '10px'}}>
+                                    ℹ️ Laissez vide si vous ne voulez pas changer le mot de passe
+                                </p>
+
+                                <div className="modal-actions">
+                                    <button type="submit" className="btn btn-success" disabled={loading}>
+                                        {loading ? "⏳ Modification..." : "💾 SAUVEGARDER"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => setShowEditUserForm(false)}
+                                        disabled={loading}
+                                    >
+                                        ANNULER
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
 
                 {/* Dashboard Stats */}
                 {activeMenu === "dashboard" && (
@@ -774,14 +1084,18 @@ function DashboardAdmin() {
                 )}
 
                 {/* Gestion des Utilisateurs */}
-                {/* Gestion des Utilisateurs - REMPLACER cette section */}
                 {activeMenu === "utilisateurs" && (
                     <div className="recent-section">
                         <div className="section-header">
                             <h3 className="chart-title">Liste des Utilisateurs</h3>
-                            <button className="btn btn-primary" onClick={loadUsers}>
-                                🔄 Actualiser
-                            </button>
+                            <div className="section-actions" style={{display: 'flex', gap: '10px'}}>
+                                <button className="btn btn-primary" onClick={loadUsers}>
+                                    🔄 Actualiser
+                                </button>
+                                <button className="btn btn-success" onClick={() => setShowUserForm(true)}>
+                                    ➕ Nouvel Utilisateur
+                                </button>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -799,6 +1113,16 @@ function DashboardAdmin() {
                             </div>
                         ) : (
                             <div className="table-container">
+                                <div className="filter-section" style={{marginBottom: '20px', display: 'flex', gap: '10px'}}>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="🔍 Filtrer par nom, email ou rôle..."
+                                        value={filterUser}
+                                        onChange={(e) => setFilterUser(e.target.value)}
+                                        style={{maxWidth: '400px'}}
+                                    />
+                                </div>
                                 <table className="recent-table">
                                     <thead>
                                     <tr>
@@ -813,38 +1137,58 @@ function DashboardAdmin() {
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    {users.map(user => (
-                                        <tr key={user.id}>
-                                            <td className="user-id">#{user.id}</td>
-                                            <td><strong>{user.prenom} {user.nom}</strong></td>
-                                            <td>{user.email}</td>
-                                            <td>{user.telephone || 'N/A'}</td>
-                                            <td>
-                                <span className={`status-badge ${
-                                    user.role === 'ADMIN' ? 'status-cancelled' : 'status-confirmed'
-                                }`}>
-                                    {user.role}
-                                </span>
-                                            </td>
-                                            <td>
-                                <span className={`status-badge ${
-                                    user.actif ? 'status-confirmed' : 'status-pending'
-                                }`}>
-                                    {user.actif ? '✓ Actif' : '✗ Inactif'}
-                                </span>
-                                            </td>
-                                            <td>{formatDate(user.createdAt)}</td>
-                                            <td>
-                                                <button
-                                                    className={`btn btn-sm ${user.actif ? 'btn-warning' : 'btn-success'}`}
-                                                    onClick={() => toggleUserStatus(user.id, user.actif)}
-                                                    title={user.actif ? 'Désactiver' : 'Activer'}
-                                                >
-                                                    {user.actif ? '🚫 Désactiver' : '✅ Activer'}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {users
+                                        .filter(user => {
+                                            const searchTerm = filterUser.toLowerCase();
+                                            return filterUser === "" ||
+                                                (user.nom || '').toLowerCase().includes(searchTerm) ||
+                                                (user.prenom || '').toLowerCase().includes(searchTerm) ||
+                                                (user.email || '').toLowerCase().includes(searchTerm) ||
+                                                (user.role || '').toLowerCase().includes(searchTerm);
+                                        })
+                                        .map(user => (
+                                            <tr key={user.id}>
+                                                <td className="user-id">#{user.id}</td>
+                                                <td><strong>{user.prenom} {user.nom}</strong></td>
+                                                <td>{user.email}</td>
+                                                <td>{user.telephone || 'N/A'}</td>
+                                                <td>
+                                                <span className={`status-badge ${
+                                                    user.role === 'ADMIN' ? 'status-cancelled' : 'status-confirmed'
+                                                }`}>
+                                                    {user.role}
+                                                </span>
+                                                </td>
+                                                <td>
+                                                <span className={`status-badge ${
+                                                    user.actif ? 'status-confirmed' : 'status-pending'
+                                                }`}>
+                                                    {user.actif ? '✓ Actif' : '✗ Inactif'}
+                                                </span>
+                                                </td>
+                                                <td>{formatDate(user.createdAt)}</td>
+                                                <td>
+                                                    <div style={{display: 'flex', gap: '8px'}}>
+                                                        <button
+                                                            className="btn btn-sm btn-warning"
+                                                            onClick={() => handleEditUser(user)}
+                                                            title="Modifier"
+                                                            style={{minWidth: '40px'}}
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        <button
+                                                            className={`btn btn-sm ${user.actif ? 'btn-danger' : 'btn-success'}`}
+                                                            onClick={() => toggleUserStatus(user.id, user.actif)}
+                                                            title={user.actif ? 'Désactiver' : 'Activer'}
+                                                            style={{minWidth: '40px'}}
+                                                        >
+                                                            {user.actif ? '🚫' : '✅'}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -852,13 +1196,12 @@ function DashboardAdmin() {
                     </div>
                 )}
 
-
                 {/* Gestion des Chambres */}
                 {activeMenu === "chambres" && (
                     <div className="recent-section">
                         <div className="section-header">
-                            <h3 className="chart-title">Gestion des Chambres</h3>
-                            <div className="section-actions">
+                            <h3 className="chart-title">Liste des Chambres</h3>
+                            <div className="section-actions" style={{display: 'flex', gap: '10px'}}>
                                 <button className="btn btn-primary" onClick={loadChambres}>
                                     🔄 Actualiser
                                 </button>
@@ -873,98 +1216,143 @@ function DashboardAdmin() {
                                 <div className="spinner"></div>
                                 <p>Chargement des chambres...</p>
                             </div>
-                        ) : !Array.isArray(chambres) || chambres.length === 0 ? (
+                        ) : chambres.length === 0 ? (
                             <div className="empty-state">
                                 <div className="empty-icon">🛏</div>
                                 <p>Aucune chambre trouvée</p>
-                                <button className="btn btn-success" onClick={() => setShowChambreForm(true)}>
-                                    ➕ Créer la première chambre
+                                <button className="btn btn-primary" onClick={loadChambres}>
+                                    Réessayer
                                 </button>
                             </div>
                         ) : (
-                            <div className="chambres-grid-admin">
-                                {chambres.map(chambre => (
-                                    <div key={chambre.id_chambre || chambre.id} className="chambre-card-admin">
-                                        {/* Image */}
-                                        <div className="chambre-image-admin">
-                                            <img
-                                                src={chambre.photo_url || 'https://via.placeholder.com/400x250?text=Chambre'}
-                                                alt={`Chambre ${chambre.numero}`}
-                                                onError={(e) => {
-                                                    e.target.src = 'https://via.placeholder.com/400x250?text=Chambre';
-                                                }}
+                            <div className="table-container">
+                                <div className="filter-section" style={{marginBottom: '20px'}}>
+                                    <div style={{display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap'}}>
+                                        <div className="form-group" style={{marginBottom: 0}}>
+                                            <label style={{display: 'block', marginBottom: '5px', fontSize: '0.9em', fontWeight: '500'}}>
+                                                🏨 Types de chambres
+                                            </label>
+                                            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                                                {['Standard', 'Deluxe', 'Suite Deluxe', 'Suite Premium'].map(type => (
+                                                    <label key={type} style={{display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer'}}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={filterChambreTypes.includes(type)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setFilterChambreTypes([...filterChambreTypes, type]);
+                                                                } else {
+                                                                    setFilterChambreTypes(filterChambreTypes.filter(t => t !== type));
+                                                                }
+                                                            }}
+                                                        />
+                                                        {type}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group" style={{marginBottom: 0}}>
+                                            <label style={{display: 'block', marginBottom: '5px', fontSize: '0.9em', fontWeight: '500'}}>
+                                                💰 Prix maximum (MAD)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                className="form-control"
+                                                placeholder="Ex: 1000"
+                                                value={filterPrixMax}
+                                                onChange={(e) => setFilterPrixMax(e.target.value)}
+                                                style={{width: '150px'}}
                                             />
-                                            <div className="chambre-numero-badge">#{chambre.numero}</div>
-                                            <span className={`statut-badge-admin ${getChambreStatusClass(chambre.statut)}`}>
-                                {chambre.statut}
-                            </span>
                                         </div>
-
-                                        {/* Contenu */}
-                                        <div className="chambre-content-admin">
-                                            <h4>{chambre.type}</h4>
-
-                                            <div className="chambre-details-admin">
-                                                <div className="detail-item">
-                                                    <span className="detail-icon">👥</span>
-                                                    <span>{chambre.capacite_personne || 2} pers.</span>
-                                                </div>
-                                                <div className="detail-item">
-                                                    <span className="detail-icon">🛏</span>
-                                                    <span>{chambre.nb_lits || 1} lit(s)</span>
-                                                </div>
-                                                <div className="detail-item">
-                                                    <span className="detail-icon">📐</span>
-                                                    <span>{chambre.superficie || 25}m²</span>
-                                                </div>
-                                                <div className="detail-item">
-                                                    <span className="detail-icon">🏢</span>
-                                                    <span>Étage {chambre.etage || 1}</span>
-                                                </div>
-                                            </div>
-
-                                            {chambre.vue && (
-                                                <div className="chambre-vue">
-                                                    <span>🌳</span> {chambre.vue}
-                                                </div>
-                                            )}
-
-                                            <div className="chambre-prix-admin">
-                                                <span className="prix-montant">{chambre.prix_par_nuit} MAD</span>
-                                                <span className="prix-unite">/ nuit</span>
-                                            </div>
-
-                                            {/* Actions */}
-                                            <div className="chambre-actions">
-                                                <button
-                                                    className="btn btn-warning btn-sm"
-                                                    onClick={() => handleEditChambre(chambre)}
-                                                    title="Modifier"
-                                                >
-                                                    ✏️ Modifier
-                                                </button>
-                                                <button
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() => deleteChambre(chambre.id_chambre || chambre.id, chambre.numero)}
-                                                    title="Supprimer"
-                                                >
-                                                    🗑️ Supprimer
-                                                </button>
-                                            </div>
-                                        </div>
+                                        {(filterChambreTypes.length > 0 || filterPrixMax) && (
+                                            <button
+                                                className="btn btn-sm btn-secondary"
+                                                onClick={() => {
+                                                    setFilterChambreTypes([]);
+                                                    setFilterPrixMax('');
+                                                }}
+                                                style={{height: '38px'}}
+                                            >
+                                                🔄 Réinitialiser
+                                            </button>
+                                        )}
                                     </div>
-                                ))}
+                                </div>
+                                <table className="recent-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Photo</th>
+                                        <th>Numéro</th>
+                                        <th>Type</th>
+                                        <th>Prix/Nuit</th>
+                                        <th>Statut</th>
+                                        <th>Capacité</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {chambres
+                                        .filter(chambre => {
+                                            // Filtre par type
+                                            const typeMatch = filterChambreTypes.length === 0 ||
+                                                filterChambreTypes.includes(chambre.type);
+
+                                            // Filtre par prix max
+                                            const prixMatch = !filterPrixMax ||
+                                                chambre.prix_par_nuit <= parseFloat(filterPrixMax);
+
+                                            return typeMatch && prixMatch;
+                                        })
+                                        .map(chambre => (
+                                            <tr key={chambre.id_chambre || chambre.id}>
+                                                <td>
+                                                    <img
+                                                        src={chambre.photo_url || PHOTOS_CHAMBRES[0].url}
+                                                        alt={`Chambre ${chambre.numero}`}
+                                                        style={{width: '80px', height: '60px', objectFit: 'cover', borderRadius: '4px'}}
+                                                    />
+                                                </td>
+                                                <td><strong>#{chambre.numero}</strong></td>
+                                                <td>{chambre.type}</td>
+                                                <td><strong>{chambre.prix_par_nuit} MAD</strong></td>
+                                                <td>
+                                                <span className={`status-badge ${getChambreStatusClass(chambre.statut)}`}>
+                                                    {chambre.statut}
+                                                </span>
+                                                </td>
+                                                <td>{chambre.capacite_personne} pers.</td>
+                                                <td>
+                                                    <div style={{display: 'flex', gap: '8px'}}>
+                                                        <button
+                                                            className="btn btn-sm btn-warning"
+                                                            onClick={() => handleEditChambre(chambre)}
+                                                            title="Modifier"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-sm btn-danger"
+                                                            onClick={() => deleteChambre(chambre.id_chambre || chambre.id, chambre.numero)}
+                                                            title="Supprimer"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>
                 )}
 
-
                 {/* Gestion des Réservations */}
                 {activeMenu === "reservations" && (
                     <div className="recent-section">
                         <div className="section-header">
-                            <h3>Gestion des Réservations</h3>
+                            <h3 className="chart-title">Liste des Réservations</h3>
                             <button className="btn btn-primary" onClick={loadReservations}>
                                 🔄 Actualiser
                             </button>
@@ -975,40 +1363,63 @@ function DashboardAdmin() {
                                 <div className="spinner"></div>
                                 <p>Chargement des réservations...</p>
                             </div>
+                        ) : reservations.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="empty-icon">📅</div>
+                                <p>Aucune réservation trouvée</p>
+                            </div>
                         ) : (
-                            <table className="recent-table">
-                                <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Client</th>
-                                    <th>Chambre</th>
-                                    <th>Dates</th>
-                                    <th>Montant</th>
-                                    <th>Statut</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {reservations.map(reservation => (
-                                    <tr key={reservation.id}>
-                                        <td>#{reservation.id}</td>
-                                        <td>Client #{reservation.idClient}</td>
-                                        <td>Chambre #{reservation.idChambre}</td>
-                                        <td>
-                                            {formatDate(reservation.dateArrivee)} - {formatDate(reservation.dateDepart)}
-                                        </td>
-                                        <td>{reservation.montantTotal} MAD</td>
-                                        <td>
-                                                <span className={`status-badge ${
-                                                    reservation.statut === 'CONFIRMEE' ? 'status-confirmed' :
-                                                        reservation.statut === 'ANNULEE' ? 'status-cancelled' : 'status-pending'
-                                                }`}>
-                                                    {reservation.statut}
-                                                </span>
-                                        </td>
+                            <div className="table-container">
+                                <div className="filter-section" style={{marginBottom: '20px', display: 'flex', gap: '10px'}}>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="🔍 Filtrer par client, chambre ou statut..."
+                                        value={filterReservation}
+                                        onChange={(e) => setFilterReservation(e.target.value)}
+                                        style={{maxWidth: '400px'}}
+                                    />
+                                </div>
+                                <table className="recent-table">
+                                    <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Client</th>
+                                        <th>Chambre</th>
+                                        <th>Date début</th>
+                                        <th>Date fin</th>
+                                        <th>Statut</th>
                                     </tr>
-                                ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                    {reservations
+                                        .filter(reservation => {
+                                            const searchTerm = filterReservation.toLowerCase();
+                                            const clientName = getClientName(reservation.idClient || reservation.userId).toLowerCase();
+                                            const chambreInfo = getChambreInfo(reservation.idChambre || reservation.roomId).toLowerCase();
+                                            const statut = (reservation.statut || 'confirmee').toLowerCase();
+                                            return filterReservation === "" ||
+                                                clientName.includes(searchTerm) ||
+                                                chambreInfo.includes(searchTerm) ||
+                                                statut.includes(searchTerm);
+                                        })
+                                        .map(reservation => (
+                                            <tr key={reservation.idReservation || reservation.id}>
+                                                <td>#{reservation.idReservation || reservation.id}</td>
+                                                <td><strong>{getClientName(reservation.idClient || reservation.userId)}</strong></td>
+                                                <td><strong>{getChambreInfo(reservation.idChambre || reservation.roomId)}</strong></td>
+                                                <td>{formatDate(reservation.dateDebut)}</td>
+                                                <td>{formatDate(reservation.dateFin)}</td>
+                                                <td>
+                                                <span className={`status-badge ${getReservationStatusClass(reservation.statut || 'CONFIRMEE')}`}>
+                                                    {reservation.statut || 'CONFIRMEE'}
+                                                </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </div>
                 )}

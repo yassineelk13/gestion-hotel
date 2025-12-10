@@ -14,17 +14,18 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
-            // ✅ DÉFINIR LE RATE LIMITER 'api' (OBLIGATOIRE)
+            // ✅ AUGMENTÉ À 10000 POUR LES TESTS DE CHARGE
             RateLimiter::for('api', function (Request $request) {
-                return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+                return Limit::perMinute(10000)->by($request->user()?->id ?: $request->ip());
             });
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
-        
+
         // Middleware pour API
         $middleware->api(prepend: [
-            \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
+            // ✅ THROTTLE DÉSACTIVÉ POUR LES TESTS
+            // \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ]);
 

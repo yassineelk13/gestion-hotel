@@ -4,11 +4,16 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import axios from 'axios';
 import ChambresDisponibles from './ChambresDisponibles';
+import ModalPaiement from '../components/ModalPaiement';  // ✅ NOUVEAU
 
 function DashboardClient() {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = user.user?.id;
+
+    // ✅ NOUVEAUX ÉTATS pour paiement
+    const [showPaiement, setShowPaiement] = useState(false);
+    const [selectedFacture, setSelectedFacture] = useState(null);
 
     const [activeMenu, setActiveMenu] = useState("dashboard");
     const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -25,6 +30,11 @@ function DashboardClient() {
     const [factures, setFactures] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+
+
+    // États pour le filtrage
+    const [filterReservation, setFilterReservation] = useState("");
+    const [filterFacture, setFilterFacture] = useState("");
 
     // États pour le profil
     const [profileData, setProfileData] = useState({
@@ -54,66 +64,7 @@ function DashboardClient() {
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
-    // Ajouter cette fonction
-    const handlePayerFacture = async (idFacture) => {
-        if (!window.confirm('Confirmer le paiement de cette facture ?')) {
-            return;
-        }
 
-        try {
-            await axios.post(
-                `http://localhost:8083/api/factures/${idFacture}/payer`,
-                {},
-                {
-                    auth: {
-                        username: 'admin',
-                        password: 'admin123'
-                    }
-                }
-            );
-
-            showMessage('success', '✅ Facture payée avec succès !');
-            fetchFactures();
-
-        } catch (err) {
-            showMessage('error', '❌ Erreur lors du paiement: ' + (err.response?.data || err.message));
-        }
-    };
-
-    // Fonction pour télécharger le PDF
-    const handleDownloadPdf = async (idFacture) => {
-        try {
-            console.log('📄 Téléchargement PDF facture', idFacture);
-
-            const response = await axios.get(
-                `http://localhost:8083/api/factures/${idFacture}/pdf`,
-                {
-                    auth: {
-                        username: 'admin',
-                        password: 'admin123'
-                    },
-                    responseType: 'blob' // Important pour les fichiers binaires
-                }
-            );
-
-            // Créer un lien de téléchargement
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `facture-${idFacture}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-
-            showMessage('success', '✅ Facture téléchargée !');
-
-        } catch (err) {
-            console.error('❌ Erreur téléchargement PDF:', err);
-            showMessage('error', '❌ Erreur lors du téléchargement');
-        }
-    };
-
-    // Récupérer les réservations
     const fetchReservations = async () => {
         try {
             setLoading(true);
@@ -136,16 +87,13 @@ function DashboardClient() {
 
             setReservations(reservationsData);
 
-            // Calculer les statistiques
             const actives = reservationsData.filter(r => r.statut === 'CONFIRMEE').length;
 
-            // Trouver la prochaine arrivée
             const now = new Date();
             const prochaine = reservationsData
                 .filter(r => r.statut === 'CONFIRMEE' && new Date(r.dateDebut) > now)
                 .sort((a, b) => new Date(a.dateDebut) - new Date(b.dateDebut))[0];
 
-            // Compter les factures en attente (à partir des réservations)
             const facturesEnAttente = reservationsData.filter(
                 r => r.facture && r.facture.etat === 'EMISE'
             ).length;
@@ -166,7 +114,6 @@ function DashboardClient() {
         }
     };
 
-    // Récupérer les factures
     const fetchFactures = async () => {
         try {
             setLoading(true);
@@ -174,7 +121,6 @@ function DashboardClient() {
 
             console.log('🔍 Récupération des factures pour userId:', userId);
 
-            // Récupérer les réservations du client
             const reservationsResponse = await axios.get(
                 `http://localhost:8083/api/reservations?idClient=${userId}`,
                 {
@@ -187,7 +133,6 @@ function DashboardClient() {
 
             const reservationsData = reservationsResponse.data;
 
-            // Extraire les factures des réservations
             const allFactures = reservationsData
                 .filter(r => r.facture)
                 .map(r => ({
@@ -195,7 +140,6 @@ function DashboardClient() {
                     idReservation: r.idReservation
                 }));
 
-            // Trier par date (plus récentes d'abord)
             allFactures.sort((a, b) => new Date(b.dateEmission) - new Date(a.dateEmission));
 
             console.log('✅ Factures récupérées:', allFactures);
@@ -210,7 +154,6 @@ function DashboardClient() {
         }
     };
 
-    // Annuler une réservation
     const handleCancelReservation = async (idReservation) => {
         if (!window.confirm('Êtes-vous sûr de vouloir annuler cette réservation ?')) {
             return;
@@ -234,7 +177,38 @@ function DashboardClient() {
         }
     };
 
-    // Formater les dates
+    const handleDownloadPdf = async (idFacture) => {
+        try {
+            console.log('📄 Téléchargement PDF facture', idFacture);
+
+            const response = await axios.get(
+                `http://localhost:8083/api/factures/${idFacture}/pdf`,
+                {
+                    auth: {
+                        username: 'admin',
+                        password: 'admin123'
+                    },
+                    responseType: 'blob'
+                }
+            );
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `facture-${idFacture}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            showMessage('success', '✅ Facture téléchargée !');
+
+        } catch (err) {
+            console.error('❌ Erreur téléchargement PDF:', err);
+            showMessage('error', '❌ Erreur lors du téléchargement');
+        }
+    };
+
+
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString('fr-FR', {
             day: '2-digit',
@@ -243,7 +217,6 @@ function DashboardClient() {
         });
     };
 
-    // Formater le montant
     const formatMontant = (montant) => {
         if (!montant && montant !== 0) return 'N/A';
         return new Intl.NumberFormat('fr-MA', {
@@ -252,7 +225,6 @@ function DashboardClient() {
         }).format(montant);
     };
 
-    // Obtenir le badge de statut
     const getStatutBadge = (statut) => {
         const classes = {
             'CONFIRMEE': 'status-confirmed',
@@ -381,9 +353,12 @@ function DashboardClient() {
 
             {/* Sidebar */}
             <div className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-                <div className="logo">
-                    <span className="logo-icon">🏨</span>
-                    <span>HotelMS</span>
+                <div className="logo-hotel">
+                    <div className="logo-hotel-icon">🏨</div>
+                    <div className="logo-hotel-text">
+                        <span className="brand">HotelMS</span>
+                        <span className="tagline">Gestion Hôtelière</span>
+                    </div>
                 </div>
                 <div className={`menu-item ${activeMenu === "dashboard" ? "active" : ""}`}
                      onClick={() => {
@@ -441,6 +416,7 @@ function DashboardClient() {
                         {activeMenu === "reservations" && "Mes Réservations"}
                         {activeMenu === "profile" && "Mon Profil"}
                         {activeMenu === "factures" && "Mes Factures"}
+                        {activeMenu === "chambres" && "Chambres Disponibles"}
                     </h1>
                     <div className="user-info">
                         <div className="user-details">
@@ -540,7 +516,6 @@ function DashboardClient() {
                             </div>
                         </div>
 
-                        {/* ✅ AJOUTER CETTE SECTION */}
                         <div className="action-cards">
                             <div className="action-card" onClick={() => setActiveMenu("chambres")}>
                                 <div className="action-icon">🏨</div>
@@ -563,7 +538,6 @@ function DashboardClient() {
                                 <button className="btn-action">Voir mes factures</button>
                             </div>
                         </div>
-
 
                         {/* Réservations récentes */}
                         <div className="recent-section">
@@ -618,10 +592,9 @@ function DashboardClient() {
                     </>
                 )}
 
-                {/* Section Réservations complètes */}
+                {/* Section Réservations complètes avec FILTRAGE */}
                 {activeMenu === "reservations" && !loading && (
                     <div className="recent-section">
-                        {/* ✅ AJOUTER CE HEADER */}
                         <div className="section-header">
                             <h3 className="chart-title">Toutes mes réservations</h3>
                             <button
@@ -643,51 +616,76 @@ function DashboardClient() {
                                 </button>
                             </div>
                         ) : (
-                            <table className="recent-table">
-                                <thead>
-                                <tr>
-                                    <th>Référence</th>
-                                    <th>Chambre</th>
-                                    <th>Date d'arrivée</th>
-                                    <th>Date de départ</th>
-                                    <th>Montant</th>
-                                    <th>Statut</th>
-                                    <th>Actions</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {reservations.map((reservation) => (
-                                    <tr key={reservation.idReservation}>
-                                        <td>#{reservation.idReservation}</td>
-                                        <td>Standard - Chambre {reservation.idChambre}</td>
-                                        <td>{formatDate(reservation.dateDebut)}</td>
-                                        <td>{formatDate(reservation.dateFin)}</td>
-                                        <td className="fw-bold">
-                                            {reservation.facture ? formatMontant(reservation.facture.montantTotal) : 'N/A'}
-                                        </td>
-                                        <td>{getStatutBadge(reservation.statut)}</td>
-                                        <td>
-                                            <div className="action-buttons">
-                                                {reservation.statut === 'CONFIRMEE' && (
-                                                    <button
-                                                        className="btn btn-cancel"
-                                                        onClick={() => handleCancelReservation(reservation.idReservation)}
-                                                    >
-                                                        Annuler
-                                                    </button>
-                                                )}
-                                                <button className="btn btn-view">Détails</button>
-                                            </div>
-                                        </td>
+                            <>
+                                {/* Filtrage Réservations */}
+                                <div className="filter-section" style={{marginBottom: '20px', display: 'flex', gap: '10px'}}>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="🔍 Filtrer par référence, chambre ou statut..."
+                                        value={filterReservation}
+                                        onChange={(e) => setFilterReservation(e.target.value)}
+                                        style={{maxWidth: '400px'}}
+                                    />
+                                </div>
+
+                                <table className="recent-table">
+                                    <thead>
+                                    <tr>
+                                        <th>Référence</th>
+                                        <th>Chambre</th>
+                                        <th>Date d'arrivée</th>
+                                        <th>Date de départ</th>
+                                        <th>Montant</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
                                     </tr>
-                                ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                    {reservations
+                                        .filter(reservation => {
+                                            const searchTerm = filterReservation.toLowerCase();
+                                            const ref = `#${reservation.idReservation}`.toLowerCase();
+                                            const chambre = `chambre ${reservation.idChambre}`.toLowerCase();
+                                            const statut = (reservation.statut || '').toLowerCase();
+                                            return filterReservation === "" ||
+                                                ref.includes(searchTerm) ||
+                                                chambre.includes(searchTerm) ||
+                                                statut.includes(searchTerm);
+                                        })
+                                        .map((reservation) => (
+                                            <tr key={reservation.idReservation}>
+                                                <td>#{reservation.idReservation}</td>
+                                                <td>Standard - Chambre {reservation.idChambre}</td>
+                                                <td>{formatDate(reservation.dateDebut)}</td>
+                                                <td>{formatDate(reservation.dateFin)}</td>
+                                                <td className="fw-bold">
+                                                    {reservation.facture ? formatMontant(reservation.facture.montantTotal) : 'N/A'}
+                                                </td>
+                                                <td>{getStatutBadge(reservation.statut)}</td>
+                                                <td>
+                                                    <div className="action-buttons">
+                                                        {reservation.statut === 'CONFIRMEE' && (
+                                                            <button
+                                                                className="btn btn-cancel"
+                                                                onClick={() => handleCancelReservation(reservation.idReservation)}
+                                                            >
+                                                                Annuler
+                                                            </button>
+                                                        )}
+                                                        <button className="btn btn-view">Détails</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </>
                         )}
                     </div>
                 )}
 
-                {/* Section Factures */}
+                {/* Section Factures avec FILTRAGE */}
                 {activeMenu === "factures" && !loading && (
                     <div className="recent-section">
                         <h3 className="chart-title">Mes Factures</h3>
@@ -696,51 +694,113 @@ function DashboardClient() {
                                 <p>💰 Vous n'avez aucune facture</p>
                             </div>
                         ) : (
-                            <table className="recent-table">
-                                <thead>
-                                <tr>
-                                    <th>N° Facture</th>
-                                    <th>Réservation</th>
-                                    <th>Date d'émission</th>
-                                    <th>Montant</th>
-                                    <th>État</th>
-                                    <th>Actions</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {factures.map((facture) => (
-                                    <tr key={facture.idFacture}>
-                                        <td>#{facture.idFacture}</td>
-                                        <td>#{facture.idReservation}</td>
-                                        <td>{formatDate(facture.dateEmission)}</td>
-                                        <td className="fw-bold">{formatMontant(facture.montantTotal)}</td>
-                                        <td>{getFactureStatutBadge(facture.etat)}</td>
-                                        <td>
-                                            <div className="action-buttons">
-                                                {facture.etat === 'EMISE' && (
-                                                    <button
-                                                        className="btn btn-pay"
-                                                        onClick={() => handlePayerFacture(facture.idFacture)}
-                                                    >
-                                                        Payer
-                                                    </button>
-                                                )}
+                            <>
+                                {/* Filtrage Factures */}
+                                <div className="filter-section" style={{marginBottom: '20px', display: 'flex', gap: '10px'}}>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        placeholder="🔍 Filtrer par numéro, réservation ou état..."
+                                        value={filterFacture}
+                                        onChange={(e) => setFilterFacture(e.target.value)}
+                                        style={{maxWidth: '400px'}}
+                                    />
+                                </div>
 
-                                                <button
-                                                    className="btn btn-view"
-                                                    onClick={() => handleDownloadPdf(facture.idFacture)}
-                                                >
-                                                    Télécharger PDF
-                                                </button>
-                                            </div>
-                                        </td>
+                                <table className="recent-table">
+                                    <thead>
+                                    <tr>
+                                        <th>N° Facture</th>
+                                        <th>Réservation</th>
+                                        <th>Date d'émission</th>
+                                        <th>Montant</th>
+                                        <th>État</th>
+                                        <th>Actions</th>
                                     </tr>
-                                ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                    {factures
+                                        .filter(facture => {
+                                            const searchTerm = filterFacture.toLowerCase();
+                                            const numFacture = `#${facture.idFacture}`.toLowerCase();
+                                            const numReservation = `#${facture.idReservation}`.toLowerCase();
+                                            const etat = (facture.etat || '').toLowerCase();
+                                            return filterFacture === "" ||
+                                                numFacture.includes(searchTerm) ||
+                                                numReservation.includes(searchTerm) ||
+                                                etat.includes(searchTerm);
+                                        })
+                                        .map((facture) => (
+                                            <tr key={facture.idFacture}>
+                                                <td>#{facture.idFacture}</td>
+                                                <td>#{facture.idReservation}</td>
+                                                <td>{formatDate(facture.dateEmission)}</td>
+                                                <td className="fw-bold">{formatMontant(facture.montantTotal)}</td>
+                                                <td>{getFactureStatutBadge(facture.etat)}</td>
+                                                <td>
+                                                    <div className="action-buttons" style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                                        {/* ✅ BOUTON TÉLÉCHARGER (toujours visible) */}
+                                                        <button
+                                                            className="btn-download"
+                                                            onClick={() => handleDownloadPdf(facture.idFacture)}
+                                                            style={{
+                                                                backgroundColor: '#3498db',
+                                                                color: 'white',
+                                                                padding: '8px 12px',
+                                                                border: 'none',
+                                                                borderRadius: '4px',
+                                                                cursor: 'pointer',
+                                                                fontSize: '13px'
+                                                            }}
+                                                        >
+                                                            📄 PDF
+                                                        </button>
+
+                                                        {/* ✅ BOUTON PAYER (si facture EMISE) */}
+                                                        {facture.etat === 'EMISE' && (
+                                                            <button
+                                                                className="btn-pay"
+                                                                onClick={() => {
+                                                                    setSelectedFacture(facture);
+                                                                    setShowPaiement(true);
+                                                                }}
+                                                                style={{
+                                                                    backgroundColor: '#27ae60',
+                                                                    color: 'white',
+                                                                    padding: '8px 12px',
+                                                                    border: 'none',
+                                                                    borderRadius: '4px',
+                                                                    cursor: 'pointer',
+                                                                    fontSize: '13px'
+                                                                }}
+                                                            >
+                                                                💳 Payer
+                                                            </button>
+                                                        )}
+
+                                                        {/* Badge PAYÉE */}
+                                                        {facture.etat === 'PAYEE' && (
+                                                            <span style={{
+                                                                backgroundColor: '#27ae60',
+                                                                color: 'white',
+                                                                padding: '6px 12px',
+                                                                borderRadius: '4px',
+                                                                fontSize: '12px'
+                                                            }}>
+                                                ✅ Payée
+                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </>
                         )}
                     </div>
                 )}
+
 
                 {/* Section Profil */}
                 {activeMenu === "profile" && (
@@ -751,7 +811,6 @@ function DashboardClient() {
                         </div>
 
                         <div className="profile-content">
-                            {/* Informations personnelles */}
                             <div className="profile-card">
                                 <div className="card-header">
                                     <h3>📝 Informations Personnelles</h3>
@@ -795,7 +854,6 @@ function DashboardClient() {
                                 </form>
                             </div>
 
-                            {/* Changement de mot de passe */}
                             <div className="profile-card">
                                 <div className="card-header">
                                     <h3>🔒 Sécurité du Compte</h3>
@@ -850,9 +908,27 @@ function DashboardClient() {
                         </div>
                     </div>
                 )}
+
                 {/* Section Chambres */}
                 {activeMenu === "chambres" && <ChambresDisponibles />}
             </div>
+
+            {/* ✅ MODAL DE PAIEMENT - AJOUTÉ ICI */}
+            {showPaiement && selectedFacture && (
+                <ModalPaiement
+                    facture={selectedFacture}
+                    onSuccess={() => {
+                        setShowPaiement(false);
+                        setSelectedFacture(null);
+                        showMessage('success', '✅ Paiement effectué avec succès !');
+                        fetchFactures(); // Recharger les factures
+                    }}
+                    onCancel={() => {
+                        setShowPaiement(false);
+                        setSelectedFacture(null);
+                    }}
+                />
+            )}
         </div>
     );
 }

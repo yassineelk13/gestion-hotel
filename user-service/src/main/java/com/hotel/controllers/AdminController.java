@@ -9,12 +9,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.HashMap;
-
 import java.util.List;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin")
+@CrossOrigin(origins = "http://localhost:3000")
 @PreAuthorize("hasAuthority('ADMIN')")
 public class AdminController {
 
@@ -40,34 +40,55 @@ public class AdminController {
             // Vérifier si l'email existe déjà
             Optional<Utilisateur> existing = utilisateurService.findByEmail(utilisateur.getEmail());
             if (existing.isPresent()) {
-                return ResponseEntity.badRequest().body("Email déjà utilisé");
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "❌ Cet email est déjà utilisé");
+                return ResponseEntity.badRequest().body(error);
             }
 
-            // L'admin peut définir n'importe quel rôle
-            // Pas de restriction ici - l'admin a tous les droits
+            // Encoder le mot de passe
             utilisateur.setMotDePasse(passwordEncoder.encode(utilisateur.getMotDePasse()));
+
+            // Définir actif par défaut
+            utilisateur.setActif(true);
+
             Utilisateur saved = utilisateurService.save(utilisateur);
 
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur création utilisateur: " + e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Erreur création utilisateur: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
+
     // PUT modifier un utilisateur
     @PutMapping("/users/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Utilisateur utilisateur) {
         try {
             Optional<Utilisateur> existing = utilisateurService.findById(id);
             if (existing.isEmpty()) {
-                return ResponseEntity.notFound().build();
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "❌ Utilisateur introuvable");
+                return ResponseEntity.status(404).body(error);
             }
 
             Utilisateur userToUpdate = existing.get();
+
+            // Vérifier si l'email est déjà utilisé par un autre utilisateur
+            if (!userToUpdate.getEmail().equals(utilisateur.getEmail())) {
+                Optional<Utilisateur> emailExists = utilisateurService.findByEmail(utilisateur.getEmail());
+                if (emailExists.isPresent()) {
+                    Map<String, String> error = new HashMap<>();
+                    error.put("message", "❌ Cet email est déjà utilisé");
+                    return ResponseEntity.badRequest().body(error);
+                }
+            }
 
             // Mettre à jour les champs
             userToUpdate.setNom(utilisateur.getNom());
             userToUpdate.setPrenom(utilisateur.getPrenom());
             userToUpdate.setEmail(utilisateur.getEmail());
+            userToUpdate.setTelephone(utilisateur.getTelephone());
             userToUpdate.setRole(utilisateur.getRole());
 
             // Mettre à jour le mot de passe seulement si fourni
@@ -78,31 +99,13 @@ public class AdminController {
             Utilisateur updated = utilisateurService.save(userToUpdate);
             return ResponseEntity.ok(updated);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur modification utilisateur: " + e.getMessage());
-        }
-    }
-    // DELETE supprimer un utilisateur
-    @DeleteMapping("/users/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-        try {
-            Optional<Utilisateur> user = utilisateurService.findById(id);
-            if (user.isEmpty()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            // Empêcher la suppression des ADMIN et RECEPTIONNISTE
-            Role userRole = user.get().getRole();
-            if (userRole == Role.ADMIN || userRole == Role.RECEPTIONNISTE) {
-                return ResponseEntity.badRequest().body("Impossible de supprimer un administrateur ou réceptionniste");
-            }
-
-            utilisateurService.deleteById(id);
-            return ResponseEntity.ok("Utilisateur supprimé");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur suppression: " + e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Erreur modification utilisateur: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 
+    // PUT changer le statut (actif/inactif)
     @PutMapping("/users/{id}/status")
     public ResponseEntity<?> changeUserStatus(
             @PathVariable Long id,
@@ -111,30 +114,53 @@ public class AdminController {
         try {
             Optional<Utilisateur> existing = utilisateurService.findById(id);
             if (existing.isEmpty()) {
-                return ResponseEntity.notFound().build();
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "❌ Utilisateur introuvable");
+                return ResponseEntity.status(404).body(error);
             }
 
             Utilisateur user = existing.get();
             user.setActif(request.isActif());
 
             Utilisateur updated = utilisateurService.save(user);
+
             return ResponseEntity.ok(updated);
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur changement statut: " + e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Erreur changement statut: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 
-    // Classe interne pour la requête de statut
-    public static class StatusRequest {
-        private boolean actif;
+    // DELETE supprimer un utilisateur (désactivé - on préfère désactiver)
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        try {
+            Optional<Utilisateur> user = utilisateurService.findById(id);
+            if (user.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "❌ Utilisateur introuvable");
+                return ResponseEntity.status(404).body(error);
+            }
 
-        public boolean isActif() {
-            return actif;
-        }
+            // Empêcher la suppression des ADMIN et RECEPTIONNISTE
+            Role userRole = user.get().getRole();
+            if (userRole == Role.ADMIN || userRole == Role.RECEPTIONNISTE) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Impossible de supprimer un administrateur ou réceptionniste");
+                return ResponseEntity.badRequest().body(error);
+            }
 
-        public void setActif(boolean actif) {
-            this.actif = actif;
+            utilisateurService.deleteById(id);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Utilisateur supprimé avec succès");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Erreur suppression: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 
@@ -169,9 +195,22 @@ public class AdminController {
             return ResponseEntity.ok(stats);
 
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur récupération stats: " + e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Erreur récupération stats: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 
+    // Classe interne pour la requête de statut
+    public static class StatusRequest {
+        private boolean actif;
 
+        public boolean isActif() {
+            return actif;
+        }
+
+        public void setActif(boolean actif) {
+            this.actif = actif;
+        }
+    }
 }

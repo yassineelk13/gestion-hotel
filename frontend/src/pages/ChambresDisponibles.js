@@ -39,7 +39,6 @@ function ChambresDisponibles() {
 
             // Adapter la structure de réponse
             if (response.data.success) {
-                // Si pagination
                 const data = response.data.data.data || response.data.data;
                 setChambres(Array.isArray(data) ? data : []);
             }
@@ -84,12 +83,6 @@ function ChambresDisponibles() {
 
     const handleReserver = (chambre) => {
         setSelectedChambre(chambre);
-
-        // Pré-remplir les dates si recherche faite
-        if (searchDates.date_debut && searchDates.date_fin) {
-            // Les dates sont déjà définies
-        }
-
         setShowModal(true);
     };
 
@@ -130,7 +123,6 @@ function ChambresDisponibles() {
             showMessage('success', '✅ Réservation créée avec succès !');
             setShowModal(false);
 
-            // Rafraîchir la liste
             if (searchDates.date_debut && searchDates.date_fin) {
                 searchChambresDisponibles();
             } else {
@@ -153,6 +145,13 @@ function ChambresDisponibles() {
             style: 'currency',
             currency: 'MAD'
         }).format(prix);
+    };
+
+    const calculateNights = () => {
+        if (!searchDates.date_debut || !searchDates.date_fin) return 0;
+        const debut = new Date(searchDates.date_debut);
+        const fin = new Date(searchDates.date_fin);
+        return Math.ceil((fin - debut) / (1000 * 60 * 60 * 24));
     };
 
     return (
@@ -329,101 +328,125 @@ function ChambresDisponibles() {
                 </div>
             )}
 
-            {/* Modal de réservation */}
-            {showModal && (
+            {/* ✨ MODAL DE RÉSERVATION MODERNE ✨ */}
+            {showModal && selectedChambre && (
                 <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h2>Réserver la chambre {selectedChambre?.numero}</h2>
-
-                        <div className="modal-body">
-                            <img
-                                src={selectedChambre?.photo_url || 'https://via.placeholder.com/400x200'}
-                                alt="Chambre"
-                                className="modal-image"
-                                onError={(e) => {
-                                    e.target.src = 'https://via.placeholder.com/400x200?text=Chambre';
-                                }}
-                            />
-
-                            <div className="reservation-summary">
-                                <h3>{selectedChambre?.type}</h3>
-                                <p><strong>Capacité:</strong> {selectedChambre?.capacite_personne} personnes</p>
-                                <p><strong>Superficie:</strong> {selectedChambre?.superficie}m²</p>
-                                {selectedChambre?.vue && <p><strong>Vue:</strong> {selectedChambre?.vue}</p>}
-                                <p><strong>Prix par nuit:</strong> {formatPrix(selectedChambre?.prix_par_nuit)}</p>
+                    <div className="reservation-modal" onClick={(e) => e.stopPropagation()}>
+                        {/* En-tête avec image */}
+                        <div className="modal-header-reservation">
+                            <div className="modal-image-container">
+                                <img
+                                    src={selectedChambre.photo_url || 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800'}
+                                    alt={`Chambre ${selectedChambre.numero}`}
+                                    onError={(e) => {
+                                        e.target.src = 'https://via.placeholder.com/800x300?text=Chambre+' + selectedChambre.numero;
+                                    }}
+                                />
+                                <div className="modal-overlay-gradient"></div>
+                                <div className="modal-title-container">
+                                    <h3>Réserver la chambre {selectedChambre.numero}</h3>
+                                    <p className="modal-subtitle">{selectedChambre.type}</p>
+                                </div>
                             </div>
+                            <button className="modal-close-btn" onClick={() => setShowModal(false)}>
+                                ×
+                            </button>
+                        </div>
 
-                            {/* ✅ AJOUTER DES CHAMPS DE DATES MODIFIABLES */}
-                            <div className="dates-selection">
-                                <h3>📅 Sélectionnez vos dates</h3>
-
-                                <div className="form-group">
-                                    <label>Date d'arrivée *</label>
-                                    <input
-                                        type="date"
-                                        value={searchDates.date_debut || ''}
-                                        onChange={(e) => setSearchDates({
-                                            ...searchDates,
-                                            date_debut: e.target.value
-                                        })}
-                                        min={new Date().toISOString().split('T')[0]}
-                                        required
-                                    />
+                        {/* Détails de la chambre */}
+                        <div className="chambre-details-modal">
+                            <div className="details-grid">
+                                <div className="detail-card">
+                                    <div className="detail-icon">👥</div>
+                                    <div className="detail-label">Capacité</div>
+                                    <div className="detail-value">{selectedChambre.capacite_personne} personnes</div>
                                 </div>
-
-                                <div className="form-group">
-                                    <label>Date de départ *</label>
-                                    <input
-                                        type="date"
-                                        value={searchDates.date_fin || ''}
-                                        onChange={(e) => setSearchDates({
-                                            ...searchDates,
-                                            date_fin: e.target.value
-                                        })}
-                                        min={searchDates.date_debut || new Date().toISOString().split('T')[0]}
-                                        required
-                                    />
+                                <div className="detail-card">
+                                    <div className="detail-icon">📐</div>
+                                    <div className="detail-label">Superficie</div>
+                                    <div className="detail-value">{selectedChambre.superficie}m²</div>
                                 </div>
-
-                                {/* Calcul automatique du nombre de nuits et prix total */}
-                                {searchDates.date_debut && searchDates.date_fin && (
-                                    <div className="prix-calcul">
-                                        {(() => {
-                                            const debut = new Date(searchDates.date_debut);
-                                            const fin = new Date(searchDates.date_fin);
-                                            const nuits = Math.ceil((fin - debut) / (1000 * 60 * 60 * 24));
-                                            const total = nuits * (selectedChambre?.prix_par_nuit || 0);
-
-                                            return (
-                                                <>
-                                                    <p><strong>Durée:</strong> {nuits} nuit(s)</p>
-                                                    <p className="prix-total-modal">
-                                                        <strong>Prix total:</strong> {formatPrix(total)}
-                                                    </p>
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                )}
+                                <div className="detail-card">
+                                    <div className="detail-icon">🌅</div>
+                                    <div className="detail-label">Vue</div>
+                                    <div className="detail-value">{selectedChambre.vue || 'Standard'}</div>
+                                </div>
+                                <div className="detail-card">
+                                    <div className="detail-icon">💰</div>
+                                    <div className="detail-label">Prix par nuit</div>
+                                    <div className="detail-value">{formatPrix(selectedChambre.prix_par_nuit)}</div>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="modal-actions">
-                            <button className="btn btn-cancel" onClick={() => setShowModal(false)}>
-                                Annuler
-                            </button>
-                            <button
-                                className="btn btn-confirm"
-                                onClick={handleConfirmReservation}
-                                disabled={!searchDates.date_debut || !searchDates.date_fin}
-                            >
-                                Confirmer la réservation
-                            </button>
+                        {/* Formulaire de réservation */}
+                        <div className="modal-body-reservation">
+                            <h4 className="section-title-modal">📅 Sélectionnez vos dates</h4>
+
+                            <div className="form-group-modal">
+                                <label>Date d'arrivée *</label>
+                                <input
+                                    type="date"
+                                    className="form-input-modal"
+                                    value={searchDates.date_debut || ''}
+                                    onChange={(e) => setSearchDates({
+                                        ...searchDates,
+                                        date_debut: e.target.value
+                                    })}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group-modal">
+                                <label>Date de départ *</label>
+                                <input
+                                    type="date"
+                                    className="form-input-modal"
+                                    value={searchDates.date_fin || ''}
+                                    onChange={(e) => setSearchDates({
+                                        ...searchDates,
+                                        date_fin: e.target.value
+                                    })}
+                                    min={searchDates.date_debut || new Date().toISOString().split('T')[0]}
+                                    required
+                                />
+                            </div>
+
+                            {/* Calcul du prix */}
+                            {searchDates.date_debut && searchDates.date_fin && calculateNights() > 0 && (
+                                <div className="prix-calcul">
+                                    <div className="prix-detail">
+                                        <span>Nombre de nuits:</span>
+                                        <strong>{calculateNights()} nuit(s)</strong>
+                                    </div>
+                                    <div className="prix-detail prix-total-highlight">
+                                        <span>Prix total:</span>
+                                        <strong>{formatPrix(calculateNights() * selectedChambre.prix_par_nuit)}</strong>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Actions */}
+                            <div className="modal-actions-reservation">
+                                <button
+                                    className="btn-modal btn-cancel-modal"
+                                    onClick={() => setShowModal(false)}
+                                >
+                                    ❌ Annuler
+                                </button>
+                                <button
+                                    className="btn-modal btn-confirm-modal"
+                                    onClick={handleConfirmReservation}
+                                    disabled={!searchDates.date_debut || !searchDates.date_fin || calculateNights() <= 0}
+                                >
+                                    ✅ Confirmer la réservation
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
-
         </div>
     );
 }
