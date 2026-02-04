@@ -30,7 +30,7 @@ Projet de gestion d'hôtel avec architecture microservices, développé avec Spr
 
 ### Cloner le projet
 ```bash
-git clone https://github.com/VOTRE-USERNAME/gestion-hotel.git
+git clone https://github.com/yassineelk13/gestion-hotel.git
 cd gestion-hotel
 ```
 
