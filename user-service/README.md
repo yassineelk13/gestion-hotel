@@ -19,25 +19,6 @@ Application Java permettant de gérer:
 - **Maven** (Gestion des dépendances)
 - **JPA** (Java Persistence API)
 
-## 📦 Structure du projet
-
-```
-gestion-hotel/
-├── src/main/java/
-│   ├── com.hotel/
-│   │   └── Main.java
-│   ├── com.hotel.entities/
-│   │   ├── Utilisateur.java
-│   │   ├── Chambre.java
-│   │   ├── Reservation.java
-│   │   ├── Facture.java
-│   │   └── Paiement.java
-│   └── com.hotel.util/
-│       └── HibernateUtil.java
-├── src/main/resources/
-│   └── hibernate.cfg.xml
-└── pom.xml
-```
 
 ## 🗄️ Modèle de données
 
