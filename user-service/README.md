@@ -40,7 +40,7 @@ Application Java permettant de gérer:
 
 1. **Cloner le projet:**
 ```bash
-git clone https://github.com/VOTRE_USERNAME/gestion-hotel.git
+git clone https://github.com/yassineelk13/gestion-hotel.git
 cd gestion-hotel
 ```
 
@@ -68,9 +68,6 @@ L'application crée automatiquement les tables dans la base de données au premi
 
 Un jeu de données de test est inséré automatiquement.
 
-## 👨‍💻 Auteur
-
-**Votre Nom** - Projet académique
 
 ## 📄 Licence
 
